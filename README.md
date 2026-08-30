@@ -1,4 +1,4 @@
-# [Your Project Name]
+# GameLedger
 
 <!-- CI badge: after Session 4, replace ORG/REPO and the workflow filename, then uncomment:
 ![CI](https://github.com/ORG/REPO/actions/workflows/ci.yml/badge.svg)
@@ -6,10 +6,14 @@
 
 **Student:** [David Liendo] · **Course:** CEN 5064 Software Design, Fall 2026 · **Partner:** [@kummarimonisha]
 
-## Project (approval paragraph — write this by Sun Aug 30)
+## Project
 
-[One paragraph: What is the system? Who is it for? What are its 3–4 core features?
-This paragraph is your approval request — see the Project Brief, Section 2.]
+**GameLedger** is a personal video game backlog and play-session management system that is designed for gamers/players who want a local tool to efficiently
+organize their game libraries, track active playthroughs, and understand their time-investment habits. The system is built around four core features:
+(1) a library catalog to add and organize games using customizable status tags like Backlog, In Progress, Completed, and Abandoned; (2) a session
+logging tool to record play dates, duration in hours, and personal progress notes; (3) a metrics dashboard that generates completion statistics
+and tracks total time spent per genre or platform; and (4) an external API integration that dynamically fetches basic game metadata and cover art
+to populate the user's library.
 
 ## How to run
 
