@@ -29,10 +29,10 @@ instructor will follow it literally on conference days.]
 
 | Tier | Responsibilities in THIS system |
 |------|--------------------------------|
-| Presentation | [what your UI layer does] |
-| Service | [what your use-case/orchestration layer does] |
-| Domain | [your entities and business rules] |
-| Data | [how and where data is stored] |
+| Presentation | [what your UI layer does] Displays the player's game library, shows their calculated playtime metrics, and provides the forms/buttons to add new games, log a play session, or complete/abandon the current game they are logging their session in; **DashboardView:** Renders the main screen showing the list of games and the metrics overview. **LogSessionForm:** UI component that collects the date, time spent, and notes when you log a session. **GameSearchController:** Takes the text you type into the search bar and passes it to the Service tier to find a game.|
+| Service | [what your use-case/orchestration layer does] Takes the input from the Presentation tier (UI), enforces rules, interacts with external APIs (IGDB), and calls the Data tier to save things; **SessionService:** Contains the **logSession(gameId, hours, notes)** method. It validates that hours are greater than zero, saves the session, and triggers an update to the game's total playtime. **LibraryService:** Contains the **addGameToBackLog()** method, which calls the external API for cover art and metadata before saving it. **MetricsService:** Aggregates data to calculate the player's completion percentage and total hours played across all genres. |
+| Domain | [your entities and business rules] Classes represent the concepts of the application/system. **Game:** An entity containing properties like **title**, **platform**, **totalHoursPlayed**, and an enum for **GameStatus** (BACKLOG, IN_PROGRESS, COMPLETED, ABANDONED). **PlaySession:** An entity containing **date**, **duration**, and **journalNotes**. Rule: "A **Game** cannot be marked as COMPLETED if its **totalHoursPlayed** is 0." |
+| Data | [how and where data is stored] Hides the complex SQL queries behind simple interfaces so the Service tier doesn't have to write SQL; **GameRepository** (Interface): Defines contracts like **save(Game)**, **findById(id)**, and **findAllByStatus(status)**. **SqliteGameRepository**: The concrete implementation of the interface that actually executes the SQL **INSERT** and **SELECT** statements against the database. **SessionRepository**: Stores the individual play session records linked to a specific game ID. |
 
 ### C4 — Context & Container (Session 3 studio)
 
