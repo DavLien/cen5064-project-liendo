@@ -39,17 +39,17 @@ instructor will follow it literally on conference days.]
 ```mermaid
 %% Replace this placeholder with YOUR system's context diagram.
 flowchart TB
-    user([User]) -->|uses| system[Your System]
-    system -->|stores data in| db[(Database)]
+    user([Player]) -->|uses| system[GameLedger]
+    system -->|fetches data via| api[IGDB API]
 ```
 
 ```mermaid
 %% Container view: your containers should match the tier table above.
 flowchart TB
-    subgraph YourSystem [Your System]
-        ui[Web UI / CLI<br/>Presentation] --> api[Application / Service]
-        api --> domain[Domain Model]
-        domain --> db[(Database<br/>Data tier)]
+    subgraph GameLedgerSystem [GameLedger]
+        ui[Dashboard UI<br/>Presentation] --> api[SessionService<br/>Application / Service]
+        api --> domain[Game & PlaySession<br/>Domain Model]
+        domain --> db[(SQLite<br/>Data tier)]
     end
 ```
 
@@ -58,26 +58,38 @@ flowchart TB
 ```mermaid
 %% Class diagram: your 3–4 core domain classes.
 classDiagram
-    class ExampleEntity {
+    class Game {
         -id: Long
         -name: String
-        +doSomething()
+        -totalHoursPlayed: Double
+        -ststus: String
+        +updatePlaytime(hours)
     }
+
+    class PlaySession {
+        -id: Long
+        -date: String
+        -duration: Double
+        -notes: String
+    }
+
+    Game "1" --> "*" PlaySession : owns
 ```
 
 ```mermaid
 %% Sequence diagram: ONE core use case, end to end.
 sequenceDiagram
-    actor U as User
-    participant UI
-    participant S as Service
-    participant D as Data
-    U->>UI: action
-    UI->>S: request
-    S->>D: save/load
-    D-->>S: result
-    S-->>UI: response
-    UI-->>U: confirmation
+    actor U as Player
+    participant UI as DashboardView
+    participant S as SessionService
+    participant D as GameRepository
+
+    U->>UI: log session (2.5 hours, COMPLETED)
+    UI->>S: logSession(gameId, 2.5, COMPLETED)
+    S->>D: save new session & update game status
+    D-->>S: database success
+    S-->>UI: return updated game metrics
+    UI-->>U: show new total hours and status
 ```
 
 ## Architecture Decision Records
