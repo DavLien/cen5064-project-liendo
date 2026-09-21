@@ -108,3 +108,6 @@ A one-line note per week keeps your commit story readable:
 - Week 2 (Aug 31): added the complete 4-tier breakdown section, updated the section to include COMPLETED and ABANDONED checks while logging in a play session for a game, fixed the structure of the section to look more simpler and easier to read
 - Week 3 (Sept 7): updated Weekly log section and logged all past weeks done
 - Week 4 (Sept 14): 
+
+## Known Issues
+Issue 1: 
