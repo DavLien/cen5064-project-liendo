@@ -62,7 +62,7 @@ classDiagram
         -id: Long
         -name: String
         -totalHoursPlayed: Double
-        -ststus: String
+        -status: String
         +updatePlaytime(hours)
     }
 
