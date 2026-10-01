@@ -110,4 +110,4 @@ A one-line note per week keeps your commit story readable:
 - Week 4 (Sept 14): 
 
 ## Known Issues
-Issue #1: Log a play session and update game completion status
+Issue #1 (Working on): Log a play session and update total hours
