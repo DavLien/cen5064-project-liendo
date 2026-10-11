@@ -1,14 +1,15 @@
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 from data.interfaces import CatalogRepository, GameRepository
 from domain.game import Game
+
 
 class CatalogService:
     def __init__(self, catalog_repo: CatalogRepository, game_repo: GameRepository):
         self.catalog_repo = catalog_repo
         self.game_repo = game_repo
 
-    def search_games(self, query: str) -> List[Dict[str, Any]]:
+    def search_games(self, query: str) -> list[dict[str, Any]]:
         # Guard clause: Prevent empty/whitespace queries from triggering a full database retrieval.
         if not query or not query.strip():
             return []
