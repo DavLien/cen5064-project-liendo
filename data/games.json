@@ -1,0 +1,140 @@
+[
+  {
+    "catalog_id": "cat_001",
+    "title": "Elden Ring",
+    "game_modes": ["Single-Player", "Multi-Player"],
+    "developer": "FromSoftware"
+  },
+  {
+    "catalog_id": "cat_002",
+    "title": "Marvel's Spider-Man",
+    "game_modes": ["Single-Player"],
+    "developer": "Insomniac Games"
+  },
+  {
+    "catalog_id": "cat_003",
+    "title": "Hollow Knight",
+    "game_modes": ["Single-Player"],
+    "developer": "Team Cherry"
+  },
+  {
+    "catalog_id": "cat_004",
+    "title": "The Legend of Zelda: Tears of the Kingdom",
+    "game_modes": ["Single-Player"],
+    "developer": "Nintendo"
+  },
+  {
+    "catalog_id": "cat_005",
+    "title": "Cyberpunk 2077",
+    "game_modes": ["Single-Player"],
+    "developer": "CD Projekt Red"
+  },
+  {
+    "catalog_id": "cat_006",
+    "title": "Stardew Valley",
+    "game_modes": ["Single-Player", "Multi-Player"],
+    "developer": "ConcernedApe"
+  },
+  {
+    "catalog_id": "cat_007",
+    "title": "Minecraft",
+    "game_modes": ["Single-Player", "Multi-Player"],
+    "developer": "Mojang Studios"
+  },
+  {
+    "catalog_id": "cat_008",
+    "title": "Grand Theft Auto V",
+    "game_modes": ["Single-Player", "Multi-Player"],
+    "developer": "Rockstar North"
+  },
+  {
+    "catalog_id": "cat_009",
+    "title": "Red Dead Redemption 2",
+    "game_modes": ["Single-Player", "Multi-Player"],
+    "developer": "Rockstar Games"
+  },
+  {
+    "catalog_id": "cat_010",
+    "title": "Hades",
+    "game_modes": ["Single-Player"],
+    "developer": "Supergiant Games"
+  },
+  {
+    "catalog_id": "cat_011",
+    "title": "Baldur's Gate 3",
+    "game_modes": ["Single-Player", "Multi-Player"],
+    "developer": "Larian Studios"
+  },
+  {
+    "catalog_id": "cat_012",
+    "title": "God of War Ragnarök",
+    "game_modes": ["Single-Player"],
+    "developer": "Santa Monica Studio"
+  },
+  {
+    "catalog_id": "cat_013",
+    "title": "Super Smash Bros. Ultimate",
+    "game_modes": ["Single-Player", "Multi-Player"],
+    "developer": "Bandai Namco"
+  },
+  {
+    "catalog_id": "cat_014",
+    "title": "Persona 5 Royal",
+    "game_modes": ["Single-Player"],
+    "developer": "Atlus"
+  },
+  {
+    "catalog_id": "cat_015",
+    "title": "Resident Evil 4",
+    "game_modes": ["Single-Player"],
+    "developer": "Capcom"
+  },
+  {
+    "catalog_id": "cat_016",
+    "title": "Final Fantasy VII Remake",
+    "game_modes": ["Single-Player"],
+    "developer": "Square Enix"
+  },
+  {
+    "catalog_id": "cat_017",
+    "title": "Ghost of Tsushima",
+    "game_modes": ["Single-Player", "Multi-Player"],
+    "developer": "Sucker Punch Productions"
+  },
+  {
+    "catalog_id": "cat_018",
+    "title": "Bloodborne",
+    "game_modes": ["Single-Player", "Multi-Player"],
+    "developer": "FromSoftware"
+  },
+  {
+    "catalog_id": "cat_019",
+    "title": "The Witcher 3: Wild Hunt",
+    "game_modes": ["Single-Player"],
+    "developer": "CD Projekt Red"
+  },
+  {
+    "catalog_id": "cat_020",
+    "title": "Overwatch",
+    "game_modes": ["Multi-Player"],
+    "developer": "NetEase Games"
+  },
+  {
+    "catalog_id": "cat_021",
+    "title": "Marvel Rivals",
+    "game_modes": ["Multi-Player"],
+    "developer": "Blizzard Entertainment, Inc."
+  },
+  {
+    "catalog_id": "cat_022",
+    "title": "Counter-Strike 2",
+    "game_modes": ["Multi-Player"],
+    "developer": "Valve"
+  },
+  {
+    "catalog_id": "cat_023",
+    "title": "Fortnite",
+    "game_modes": ["Multi-Player"],
+    "developer": "Epic Games"
+  }
+]
