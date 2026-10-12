@@ -153,7 +153,7 @@ Decisions live in [`docs/adr/`](docs/adr/). Start with ADR-001 in Session 4.
 | # | Decision | Status |
 |---|----------|--------|
 | [001](docs/adr/adr-001.md) | [Adopt a 4-Tier Python Architecture with SQLite and JSON for Local Data Storage] | [Accepted] |
-| [002](docs/adr/adr-002.md) | [ ] | [proposed] |
+| [002](docs/adr/adr-002.md) | [Building the Presentation Tier (GUI) using CustomTkinter] | [Accepted] |
 
 ## Weekly log (optional but recommended)
 
