@@ -148,8 +148,6 @@ sequenceDiagram
 
 ## Architecture Decision Records
 
-Decisions live in [`docs/adr/`](docs/adr/). Start with ADR-001 in Session 4.
-
 | # | Decision | Status |
 |---|----------|--------|
 | [001](docs/adr/adr-001.md) | [Adopt a 4-Tier Python Architecture with SQLite and JSON for Local Data Storage] | [Accepted] |
@@ -169,5 +167,5 @@ A one-line note per week keeps your commit story readable:
 - Week 8 (Oct 12):
 
 ## Known Issues
-Issue #1: Log a play session and update game completion status
-Issue #3: Search local catalog and add game to backlog
+- Issue #1: Log a play session and update game completion status
+- Issue #3: Search local catalog and add game to backlog
