@@ -26,6 +26,7 @@ class TestCatalogService(unittest.TestCase):
             "title": "Hades",
             "game_modes": ["Single-Player"]
         }
+        self.game_repo.is_game_in_backlog.return_value = False
 
         # Mock the save_game to simulate returning a game with a generated SQLite PK
         def mock_save(game: Game) -> Game:
@@ -62,6 +63,7 @@ class TestCatalogService(unittest.TestCase):
     # a KeyError if the raw JSON record is corrupted.
     def test_add_game_handles_missing_json_keys(self):
         self.catalog_repo.get_catalog_item.return_value = {}
+        self.game_repo.is_game_in_backlog.return_value = False
         
         def mock_save(game: Game) -> Game:
             game.id = 99
