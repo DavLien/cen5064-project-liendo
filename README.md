@@ -164,8 +164,12 @@ A one-line note per week keeps your commit story readable:
 - Week 5 (Sept 21): Added Issue #1 in Issues board, created Branch for Issue #1, added Known Issues section to README.md, opened PR
 - Week 6 (Sept 28):
 - Week 7 (Oct 5): 
-- Week 8 (Oct 12):
+- Week 8 (Oct 12): Filed peer review for partner, reviewed and commented on partner's Issue 2, refactored GUI into Presentation tier and cleaned repo (action item feedback)
 
 ## Known Issues
 - Issue #1: Log a play session and update game completion status
 - Issue #3: Search local catalog and add game to backlog
+- Issue #4: View aggregated player statistics and filter library globally
+- Issue #5: Mark game as completed and leave optional rating and/or review
+- Issue #6: Mark game as abandoned and leave optional rating and/or review
+- Issue #7: Resume a completed or abandoned game
