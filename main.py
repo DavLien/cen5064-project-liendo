@@ -1,6 +1,6 @@
 from data.repositories import JsonCatalogRepository, SqliteGameRepository
-from service.catalog_service import CatalogService
 from presentation.gui import GameLedgerApp
+from service.catalog_service import CatalogService
 
 if __name__ == "__main__":
     catalog_repo = JsonCatalogRepository()
