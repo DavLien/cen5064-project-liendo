@@ -27,6 +27,13 @@ class GameRepository(ABC):
     @abstractmethod
     def update_game(self, game: Game) -> None: ...
 
+    # --- NEW FOR STEP 2 ---
+    @abstractmethod
+    def get_all_games(self) -> list[Game]: ...
+
+    @abstractmethod
+    def delete_game(self, game_id: int) -> None: ...
+
 class SessionRepository(ABC):
     @abstractmethod
     def save_session(self, session: PlaySession) -> PlaySession: ...

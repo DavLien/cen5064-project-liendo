@@ -44,3 +44,9 @@ class CatalogService:
         if mode == "All":
             return all_games
         return [g for g in all_games if mode in g.get("game_modes", [])]
+
+    def get_backlog(self) -> list[Game]:
+        return self.game_repo.get_all_games()
+
+    def remove_game(self, game_id: int) -> None:
+        self.game_repo.delete_game(game_id)
