@@ -2,139 +2,408 @@
   {
     "catalog_id": "cat_001",
     "title": "Elden Ring",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC", "Nintendo Switch 2"],
     "game_modes": ["Single-Player", "Multi-Player"],
-    "developer": "FromSoftware"
+    "developer": "FromSoftware",
+    "publisher": "Bandai Namco Entertainment",
+    "genre": "Action RPG",
+    "general_release": "02/25/22",
+    "description": "Rise, Tarnished, and be guided by grace to brandish the power of the Elden Ring and become an Elden Lord in the Lands Between."
   },
   {
     "catalog_id": "cat_002",
     "title": "Marvel's Spider-Man",
+    "platforms": ["PlayStation 4", "PlayStation 5", "PC"],
     "game_modes": ["Single-Player"],
-    "developer": "Insomniac Games"
+    "developer": "Insomniac Games",
+    "publisher": "Sony Interactive Entertainment",
+    "genre": "Action-Adventure",
+    "general_release": "09/07/18",
+    "description": "Step into the boots of an experienced Peter Parker who is more masterful at fighting big crime in Marvel's New York while struggling to balance his chaotic personal life and career."
   },
   {
     "catalog_id": "cat_003",
     "title": "Hollow Knight",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC", "Nintendo Switch"],
     "game_modes": ["Single-Player"],
-    "developer": "Team Cherry"
+    "developer": "Team Cherry",
+    "publisher": "Team Cherry",
+    "genre": "Metroidvania",
+    "general_release": "02/24/17",
+    "description": "Forge your own path in Hollow Knight! An epic action adventure through a vast ruined kingdom of insects and heroes."
   },
   {
     "catalog_id": "cat_004",
-    "title": "The Legend of Zelda: Tears of the Kingdom",
+    "title": "Hollow Knight: Silksong",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC", "Nintendo Switch", "Nintendo Switch 2"],
     "game_modes": ["Single-Player"],
-    "developer": "Nintendo"
+    "developer": "Team Cherry",
+    "publisher": "Team Cherry",
+    "genre": "Metroidvania",
+    "general_release": "09/04/25",
+    "description": "Discover a vast, haunted kingdom in Hollow Knight: Silksong! Explore, fight, and survive as Hornet while ascending to the peak of a land ruled by silk and song."
   },
   {
     "catalog_id": "cat_005",
-    "title": "Cyberpunk 2077",
+    "title": "The Legend of Zelda: Breath of the Wild",
+    "platforms": ["Nintendo Switch", "Nintendo Switch 2"],
     "game_modes": ["Single-Player"],
-    "developer": "CD Projekt Red"
+    "developer": "Nintendo EPD",
+    "publisher": "Nintendo",
+    "genre": "Action-Adventure",
+    "general_release": "03/03/17",
+    "description": "Step into a world of discovery, exploration, and adventure as Link awakens from a 100-year slumber to reclaim his memories and defeat Calamity Ganon across the wilds of Hyrule."
   },
   {
     "catalog_id": "cat_006",
-    "title": "Stardew Valley",
-    "game_modes": ["Single-Player", "Multi-Player"],
-    "developer": "ConcernedApe"
+    "title": "The Legend of Zelda: Tears of the Kingdom",
+    "platforms": ["Nintendo Switch", "Nintendo Switch 2"],
+    "game_modes": ["Single-Player"],
+    "developer": "Nintendo EPD",
+    "publisher": "Nintendo",
+    "genre": "Action-Adventure",
+    "general_release": "05/12/23",
+    "description": "An epic adventure across the land and skies of Hyrule awaits as Link harnesses powerful new abilities to fight back against the malevolent forces threatening the kingdom."
   },
   {
     "catalog_id": "cat_007",
-    "title": "Minecraft",
-    "game_modes": ["Single-Player", "Multi-Player"],
-    "developer": "Mojang Studios"
+    "title": "The Legend of Zelda: Ocarina of Time",
+    "platforms": ["Nintendo Switch 2"],
+    "game_modes": ["Single-Player"],
+    "developer": "Nintendo EPD",
+    "publisher": "Nintendo",
+    "genre": "Action-Adventure",
+    "general_release": "11/05/26",
+    "description": "Reimagined for Nintendo Switch 2, embark on Link's timeless journey across Hyrule as both a child and an adult to stop Ganondorf and save the kingdom."
   },
   {
     "catalog_id": "cat_008",
-    "title": "Grand Theft Auto V",
-    "game_modes": ["Single-Player", "Multi-Player"],
-    "developer": "Rockstar North"
+    "title": "Cyberpunk 2077",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC", "Nintendo Switch 2"],
+    "game_modes": ["Single-Player"],
+    "developer": "CD Projekt Red",
+    "publisher": "CD Projekt",
+    "genre": "Action RPG",
+    "general_release": "12/10/20",
+    "description": "An open-world, action-adventure RPG set in the megalopolis of Night City, where you play as a cyberpunk mercenary wrapped up in a do-or-die fight for survival."
   },
   {
     "catalog_id": "cat_009",
-    "title": "Red Dead Redemption 2",
+    "title": "Stardew Valley",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC", "Nintendo Switch"],
     "game_modes": ["Single-Player", "Multi-Player"],
-    "developer": "Rockstar Games"
+    "developer": "ConcernedApe",
+    "publisher": "ConcernedApe",
+    "genre": "Farm Life Sim",
+    "general_release": "02/26/16",
+    "description": "You've inherited your grandfather's old farm plot in Stardew Valley. Armed with hand-me-down tools and a few coins, you set out to begin your new life."
   },
   {
     "catalog_id": "cat_010",
-    "title": "Hades",
-    "game_modes": ["Single-Player"],
-    "developer": "Supergiant Games"
+    "title": "Minecraft",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC", "Nintendo Switch"],
+    "game_modes": ["Single-Player", "Multi-Player"],
+    "developer": "Mojang Studios",
+    "publisher": "Mojang Studios",
+    "genre": "Sandbox",
+    "general_release": "11/18/11",
+    "description": "Explore infinite blocky worlds and build everything from the simplest of homes to the grandest of castles in Creative Mode, or mine deep and craft gear to survive dangerous mobs."
   },
   {
     "catalog_id": "cat_011",
-    "title": "Baldur's Gate 3",
+    "title": "Grand Theft Auto V",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC"],
     "game_modes": ["Single-Player", "Multi-Player"],
-    "developer": "Larian Studios"
+    "developer": "Rockstar North",
+    "publisher": "Rockstar Games",
+    "genre": "Action-Adventure",
+    "general_release": "09/17/13",
+    "description": "When a young street hustler, a retired bank robber, and a terrifying psychopath find themselves entangled with the criminal underworld, they must pull off a series of dangerous heists in Los Santos."
   },
   {
     "catalog_id": "cat_012",
-    "title": "God of War Ragnarök",
-    "game_modes": ["Single-Player"],
-    "developer": "Santa Monica Studio"
+    "title": "Red Dead Redemption 2",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC"],
+    "game_modes": ["Single-Player", "Multi-Player"],
+    "developer": "Rockstar Games",
+    "publisher": "Rockstar Games",
+    "genre": "Action-Adventure",
+    "general_release": "10/26/18",
+    "description": "America, 1899. Arthur Morgan and the Van der Linde gang are outlaws on the run, forced to rob, steal, and fight their way across the rugged heartland of America in order to survive."
   },
   {
     "catalog_id": "cat_013",
-    "title": "Super Smash Bros. Ultimate",
-    "game_modes": ["Single-Player", "Multi-Player"],
-    "developer": "Bandai Namco"
+    "title": "Hades",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC", "Nintendo Switch"],
+    "game_modes": ["Single-Player"],
+    "developer": "Supergiant Games",
+    "publisher": "Supergiant Games",
+    "genre": "Roguelike",
+    "general_release": "09/17/20",
+    "description": "Defy the god of the dead as you hack and slash out of the Underworld in this fast-paced rogue-like dungeon crawler from the creators of Bastion and Transistor."
   },
   {
     "catalog_id": "cat_014",
-    "title": "Persona 5 Royal",
-    "game_modes": ["Single-Player"],
-    "developer": "Atlus"
+    "title": "Baldur's Gate 3",
+    "platforms": ["PlayStation 5", "Xbox Series X", "PC"],
+    "game_modes": ["Single-Player", "Multi-Player"],
+    "developer": "Larian Studios",
+    "publisher": "Larian Studios",
+    "genre": "RPG",
+    "general_release": "08/03/23",
+    "description": "Gather your party and return to the Forgotten Realms in a tale of fellowship and betrayal, sacrifice and survival, and the lure of absolute power set in the world of Dungeons & Dragons."
   },
   {
     "catalog_id": "cat_015",
-    "title": "Resident Evil 4",
+    "title": "God of War",
+    "platforms": ["PlayStation 4", "PC"],
     "game_modes": ["Single-Player"],
-    "developer": "Capcom"
+    "developer": "Santa Monica Studio",
+    "publisher": "Sony Interactive Entertainment",
+    "genre": "Action-Adventure",
+    "general_release": "04/20/18",
+    "description": "His vengeance against the Gods of Olympus years behind him, Kratos now lives as a man in the realm of Norse Gods and monsters, fighting to survive and teaching his son Atreus to do the same."
   },
   {
     "catalog_id": "cat_016",
-    "title": "Final Fantasy VII Remake",
+    "title": "God of War Ragnarök",
+    "platforms": ["PlayStation 4", "PlayStation 5", "PC"],
     "game_modes": ["Single-Player"],
-    "developer": "Square Enix"
+    "developer": "Santa Monica Studio",
+    "publisher": "Sony Interactive Entertainment",
+    "genre": "Action-Adventure",
+    "general_release": "11/09/22",
+    "description": "Embark on an epic and heartfelt journey as Kratos and Atreus struggle with holding on and letting go across each of the Nine Realms as the prophesied battle of Ragnarök approaches."
   },
   {
     "catalog_id": "cat_017",
-    "title": "Ghost of Tsushima",
+    "title": "Super Smash Bros. Ultimate",
+    "platforms": ["Nintendo Switch"],
     "game_modes": ["Single-Player", "Multi-Player"],
-    "developer": "Sucker Punch Productions"
+    "developer": "Bandai Namco Studios / Sora Ltd.",
+    "publisher": "Nintendo",
+    "genre": "Fighting",
+    "general_release": "12/07/18",
+    "description": "Gaming icons clash in the ultimate brawl you can play anytime, anywhere, featuring every fighter in series history alongside iconic stages, music, and modes."
   },
   {
     "catalog_id": "cat_018",
-    "title": "Bloodborne",
-    "game_modes": ["Single-Player", "Multi-Player"],
-    "developer": "FromSoftware"
+    "title": "Persona 5 Royal",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC", "Nintendo Switch"],
+    "game_modes": ["Single-Player"],
+    "developer": "P-Studio",
+    "publisher": "Atlus",
+    "genre": "JRPG",
+    "general_release": "10/31/19",
+    "description": "Don the mask of Joker and join the Phantom Thieves of Hearts as you stage grand heists, infiltrate the minds of the corrupt, and make them change their ways."
   },
   {
     "catalog_id": "cat_019",
-    "title": "The Witcher 3: Wild Hunt",
+    "title": "Resident Evil 2",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC"],
     "game_modes": ["Single-Player"],
-    "developer": "CD Projekt Red"
+    "developer": "Capcom",
+    "publisher": "Capcom",
+    "genre": "Survival Horror",
+    "general_release": "01/25/19",
+    "description": "A deadly virus engulfs the residents of Raccoon City in September 1998, plunging the city into chaos as rookie police officer Leon S. Kennedy and college student Claire Redfield fight to survive."
   },
   {
     "catalog_id": "cat_020",
-    "title": "Overwatch",
-    "game_modes": ["Multi-Player"],
-    "developer": "NetEase Games"
+    "title": "Resident Evil 3",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC"],
+    "game_modes": ["Single-Player"],
+    "developer": "Capcom",
+    "publisher": "Capcom",
+    "genre": "Survival Horror",
+    "general_release": "04/03/20",
+    "description": "Jill Valentine is one of the last remaining people in Raccoon City to witness the atrocities Umbrella performed. To stop her, Umbrella unleashes their ultimate secret weapon: Nemesis."
   },
   {
     "catalog_id": "cat_021",
-    "title": "Marvel Rivals",
-    "game_modes": ["Multi-Player"],
-    "developer": "Blizzard Entertainment, Inc."
+    "title": "Resident Evil 4",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC"],
+    "game_modes": ["Single-Player"],
+    "developer": "Capcom",
+    "publisher": "Capcom",
+    "genre": "Survival Horror",
+    "general_release": "03/24/23",
+    "description": "Six years after the biological disaster in Raccoon City, agent Leon S. Kennedy tracks the president's kidnapped daughter to a secluded European village where something is terribly wrong with the locals."
   },
   {
     "catalog_id": "cat_022",
-    "title": "Counter-Strike 2",
-    "game_modes": ["Multi-Player"],
-    "developer": "Valve"
+    "title": "Resident Evil 7: Biohazard",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC"],
+    "game_modes": ["Single-Player"],
+    "developer": "Capcom",
+    "publisher": "Capcom",
+    "genre": "Survival Horror",
+    "general_release": "01/24/17",
+    "description": "Set in a sinister plantation mansion in modern-day rural Louisiana, Ethan Winters searches for his missing wife in a terrifying first-person fight for survival against the Baker family."
   },
   {
     "catalog_id": "cat_023",
-    "title": "Fortnite",
+    "title": "Resident Evil Village",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC"],
+    "game_modes": ["Single-Player"],
+    "developer": "Capcom",
+    "publisher": "Capcom",
+    "genre": "Survival Horror",
+    "general_release": "05/07/21",
+    "description": "Experience survival horror like never before as Ethan Winters ventures into a mysterious snow-covered European village filled with monstrous threats to rescue his kidnapped daughter."
+  },
+  {
+    "catalog_id": "cat_024",
+    "title": "Resident Evil Requiem",
+    "platforms": ["PlayStation 5", "Xbox Series X", "PC", "Nintendo Switch 2"],
+    "game_modes": ["Single-Player"],
+    "developer": "Capcom",
+    "publisher": "Capcom",
+    "genre": "Survival Horror",
+    "general_release": "02/27/26",
+    "description": "Requiem for the dead. Nightmare for the living. Return to the devastated ruins of Raccoon City in a heart-stopping survival horror experience."
+  },
+  {
+    "catalog_id": "cat_025",
+    "title": "Final Fantasy VII Remake",
+    "platforms": ["PlayStation 4", "PlayStation 5", "PC"],
+    "game_modes": ["Single-Player"],
+    "developer": "Square Enix",
+    "publisher": "Square Enix",
+    "genre": "Action RPG",
+    "general_release": "04/10/20",
+    "description": "In the city of Midgar, mercenary Cloud Strife aids the eco-terrorist group Avalanche in their fight against the shadowy Shinra Electric Power Company in a reimagining of the iconic classic."
+  },
+  {
+    "catalog_id": "cat_026",
+    "title": "Final Fantasy VII Rebirth",
+    "platforms": ["PlayStation 5", "PC"],
+    "game_modes": ["Single-Player"],
+    "developer": "Square Enix",
+    "publisher": "Square Enix",
+    "genre": "Action RPG",
+    "general_release": "02/29/24",
+    "description": "After escaping the dystopian city of Midgar, Cloud and his companions embark on a journey across the vast planet in pursuit of the vengeful swordsman Sephiroth."
+  },
+  {
+    "catalog_id": "cat_027",
+    "title": "Ghost of Tsushima",
+    "platforms": ["PlayStation 4", "PlayStation 5", "PC"],
+    "game_modes": ["Single-Player", "Multi-Player"],
+    "developer": "Sucker Punch Productions",
+    "publisher": "Sony Interactive Entertainment",
+    "genre": "Action-Adventure",
+    "general_release": "07/17/20",
+    "description": "In the late 13th century, samurai Jin Sakai must set aside tradition and forge a new path as the Ghost to wage an unconventional war for the freedom of Tsushima."
+  },
+  {
+    "catalog_id": "cat_028",
+    "title": "Bloodborne",
+    "platforms": ["PlayStation 4"],
+    "game_modes": ["Single-Player", "Multi-Player"],
+    "developer": "FromSoftware",
+    "publisher": "Sony Computer Entertainment",
+    "genre": "Action RPG",
+    "general_release": "03/24/15",
+    "description": "Hunt your nightmares as you search for answers in the ancient city of Yharnam, now cursed with a strange endemic illness spreading through the streets like wildfire."
+  },
+  {
+    "catalog_id": "cat_029",
+    "title": "The Witcher 3: Wild Hunt",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC", "Nintendo Switch"],
+    "game_modes": ["Single-Player"],
+    "developer": "CD Projekt Red",
+    "publisher": "CD Projekt",
+    "genre": "Action RPG",
+    "general_release": "05/19/15",
+    "description": "You are Geralt of Rivia, mercenary monster slayer. Before you stands a war-torn, monster-infested continent you can explore at will as you track down Ciri—the Child of Prophecy."
+  },
+  {
+    "catalog_id": "cat_030",
+    "title": "Sekiro: Shadows Die Twice",
+    "platforms": ["PlayStation 4", "Xbox Series X", "PC"],
+    "game_modes": ["Single-Player"],
+    "developer": "FromSoftware",
+    "publisher": "Activision",
+    "genre": "Action-Adventure",
+    "general_release": "03/22/19",
+    "description": "Carve your own clever path to vengeance as the 'one-armed wolf', a disgraced and disfigured shinobi rescued from the brink of death in late 1500s Sengoku Japan."
+  },
+  {
+    "catalog_id": "cat_031",
+    "title": "Lies of P",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC"],
+    "game_modes": ["Single-Player"],
+    "developer": "Round8 Studio",
+    "publisher": "Neowiz",
+    "genre": "Action RPG",
+    "general_release": "09/19/23",
+    "description": "A thrilling soulslike that takes the story of Pinocchio, turns it on its head, and sets it against the darkly elegant backdrop of the Belle Époque era in the ruined city of Krat."
+  },
+  {
+    "catalog_id": "cat_032",
+    "title": "Star Wars Jedi: Fallen Order",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC"],
+    "game_modes": ["Single-Player"],
+    "developer": "Respawn Entertainment",
+    "publisher": "Electronic Arts",
+    "genre": "Action-Adventure",
+    "general_release": "11/15/19",
+    "description": "A galaxy-spanning adventure awaits in this third-person action-adventure title where an abandoned Padawan, Cal Kestis, must complete his training and rebuild the Jedi Order while staying ahead of the Empire."
+  },
+  {
+    "catalog_id": "cat_033",
+    "title": "Star Wars Jedi: Survivor",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC"],
+    "game_modes": ["Single-Player"],
+    "developer": "Respawn Entertainment",
+    "publisher": "Electronic Arts",
+    "genre": "Action-Adventure",
+    "general_release": "04/28/23",
+    "description": "The story of Cal Kestis continues five years after the events of Fallen Order as he faces an increasingly desperate fight to protect the galaxy from descending further into darkness."
+  },
+  {
+    "catalog_id": "cat_034",
+    "title": "Overwatch",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC", "Nintendo Switch"],
     "game_modes": ["Multi-Player"],
-    "developer": "Epic Games"
+    "developer": "Blizzard Entertainment",
+    "publisher": "Blizzard Entertainment",
+    "genre": "Hero Shooter",
+    "general_release": "05/24/16",
+    "description": "A team-based multiplayer hero shooter where players choose from a diverse roster of heroes with unique abilities to battle across objective-based maps around the world."
+  },
+  {
+    "catalog_id": "cat_035",
+    "title": "Marvel Rivals",
+    "platforms": ["PlayStation 5", "Xbox Series X", "PC"],
+    "game_modes": ["Multi-Player"],
+    "developer": "NetEase Games",
+    "publisher": "NetEase Games",
+    "genre": "Hero Shooter",
+    "general_release": "12/06/24",
+    "description": "Assemble an all-star Marvel squad, devise countless strategies by combining powers to form unique Team-Up skills, and fight in destructible, ever-changing battlefields across the Marvel universe."
+  },
+  {
+    "catalog_id": "cat_036",
+    "title": "Counter-Strike 2",
+    "platforms": ["PC"],
+    "game_modes": ["Multi-Player"],
+    "developer": "Valve",
+    "publisher": "Valve",
+    "genre": "Tactical FPS",
+    "general_release": "09/27/23",
+    "description": "Built on the Source 2 engine, Counter-Strike 2 delivers tactical 5v5 competitive shooter gameplay with dynamic smoke grenades, sub-tick updates, and overhauled classic maps."
+  },
+  {
+    "catalog_id": "cat_037",
+    "title": "Fortnite",
+    "platforms": ["PlayStation 4", "PlayStation 5", "Xbox Series X", "PC", "Nintendo Switch", "Nintendo Switch 2"],
+    "game_modes": ["Multi-Player"],
+    "developer": "Epic Games",
+    "publisher": "Epic Games",
+    "genre": "Battle Royale",
+    "general_release": "07/25/17",
+    "description": "Drop into a constantly evolving island to battle to be the last player standing, build and explore in Creative experiences, or team up with friends across multiple game modes."
   }
 ]

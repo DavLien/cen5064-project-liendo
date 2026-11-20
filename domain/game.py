@@ -8,3 +8,4 @@ class Game:
     game_modes: list[str]
     status: str = "Backlog"
     id: int | None = None
+    total_hours: float = 0.0
