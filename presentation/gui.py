@@ -1060,13 +1060,15 @@ class GameLedgerApp(ctk.CTk):
                 self.remove_btn.place_forget()
             else:
                 self.update_idletasks()
-                x = btn_row.winfo_rootx() - details_inner.winfo_rootx()
+                # Reverse CustomTkinter's automatic High-DPI scaling multiplication
+                scale = self.remove_btn._get_widget_scaling()
+                x = (btn_row.winfo_rootx() - details_inner.winfo_rootx()) / scale
                 y = (
-                    btn_row.winfo_rooty()
-                    - details_inner.winfo_rooty()
-                    + btn_row.winfo_height()
+                    btn_row.winfo_rooty() 
+                    - details_inner.winfo_rooty() 
+                    + btn_row.winfo_height() 
                     + 6
-                )
+                ) / scale
                 self.remove_btn.place(x=x, y=y)
                 self.remove_btn.lift()
 
@@ -1962,66 +1964,72 @@ class GameLedgerApp(ctk.CTk):
         self._cancel_timer_resize_jobs()
         self._active_scroll_canvas = None
         self._details_sync_fn = None
+        
         for widget in self.winfo_children():
             widget.destroy()
-            
-        for r in range(4): self.grid_rowconfigure(r, weight=0, minsize=0)
-        for c in range(4): self.grid_columnconfigure(c, weight=0, minsize=0)
 
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=1)
-
+        # Pack main_bg to fill the entire window (keeps the fix for the black screen delay)
         main_bg = tk.Frame(self, bg=BG_MAIN, highlightthickness=0, bd=0)
-        main_bg.grid(row=0, column=0, sticky="nsew")
+        main_bg.pack(fill="both", expand=True)
 
-        # Main centered container (B11)
+        # Tightly wrapped container that floats dead-center vertically and horizontally
         container = tk.Frame(main_bg, bg=BG_MAIN, highlightthickness=0, bd=0)
-        container.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.85, relheight=0.85)
+        container.place(relx=0.5, rely=0.5, anchor="center")
 
+        # 3-column header using grid with 'uniform' to enforce exact 33.3% distribution
         header = tk.Frame(container, bg=BG_MAIN)
         header.pack(fill="x", pady=(0, 40))
-        header.grid_columnconfigure(0, weight=1)
-        header.grid_columnconfigure(1, weight=1)
-        header.grid_columnconfigure(2, weight=1)
+        header.grid_columnconfigure((0, 1, 2), weight=1, uniform="col")
 
-        # Game
+        # Game Column (Perfectly Centered)
         g_frame = tk.Frame(header, bg=BG_MAIN)
-        g_frame.grid(row=0, column=0)
-        tk.Label(g_frame, text="Game:", fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 16)).pack()
-        tk.Label(g_frame, text=game.title, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 18, "bold"), wraplength=300).pack(pady=(5,0))
+        g_frame.grid(row=0, column=0, sticky="nsew")
+        tk.Label(g_frame, text="Game:", fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 16)).pack(anchor="center")
+        tk.Label(g_frame, text=game.title, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 16, "bold"), wraplength=250, justify="center").pack(anchor="center", pady=(5,0))
 
-        # Session Time (Much bigger to highlight importance)
+        # Time Column (Perfectly Centered)
         t_frame = tk.Frame(header, bg=BG_MAIN)
-        t_frame.grid(row=0, column=1)
-        tk.Label(t_frame, text="Session Time:", fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 16)).pack()
+        t_frame.grid(row=0, column=1, sticky="nsew")
+        tk.Label(t_frame, text="Session Time:", fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 16)).pack(anchor="center")
         main_str, ms_str = self._format_stopwatch(recorded_seconds)
-        time_lbl_frame = tk.Frame(t_frame, bg=BG_MAIN)
-        time_lbl_frame.pack(pady=(5,0))
-        tk.Label(time_lbl_frame, text=main_str, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 36, "bold")).pack(side="left", anchor="s")
-        tk.Label(time_lbl_frame, text=ms_str, fg=FG_MUTED, bg=BG_MAIN, font=("Segoe UI", 18, "bold")).pack(side="left", anchor="s", pady=(0, 6))
+        time_val_frame = tk.Frame(t_frame, bg=BG_MAIN)
+        time_val_frame.pack(anchor="center", pady=(5,0))
+        tk.Label(time_val_frame, text=main_str, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 36, "bold")).pack(side="left", anchor="s")
+        tk.Label(time_val_frame, text=ms_str, fg=FG_MUTED, bg=BG_MAIN, font=("Segoe UI", 18, "bold")).pack(side="left", anchor="s", pady=(0, 6))
 
-        # Session Date
+        # Date Column (Perfectly Centered)
         d_frame = tk.Frame(header, bg=BG_MAIN)
-        d_frame.grid(row=0, column=2)
-        tk.Label(d_frame, text="Session Date:", fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 16)).pack()
+        d_frame.grid(row=0, column=2, sticky="nsew")
+        tk.Label(d_frame, text="Session Date:", fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 16)).pack(anchor="center")
         today_str = datetime.now().strftime("%B %d, %Y")
-        tk.Label(d_frame, text=today_str, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 18, "bold")).pack(pady=(5,0))
+        tk.Label(d_frame, text=today_str, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 16, "bold")).pack(anchor="center", pady=(5,0))
 
-        # Form Inputs
-        tk.Label(container, text="Session Subject (optional):", fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 14)).pack(anchor="w", pady=(10, 5))
-        subject_entry = tk.Entry(container, font=("Segoe UI", 14), bg="#2B2B2B", fg=FG_TEXT, insertbackground=FG_TEXT, highlightbackground=FG_DIM, highlightcolor="#2563EB", relief="flat", bd=4)
-        subject_entry.pack(fill="x", pady=(0, 20))
+        # Form Inputs (Using fixed character width to establish a solid, consistent rectangle)
+        subj_frame = tk.Frame(container, bg=BG_MAIN)
+        subj_frame.pack(pady=(10, 20))
+        tk.Label(subj_frame, text="Session Subject (optional):", fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 14)).pack(anchor="w", pady=(0, 5))
+        subject_entry = tk.Entry(subj_frame, width=65, font=("Segoe UI", 14), bg="#2B2B2B", fg=FG_TEXT, insertbackground=FG_TEXT, highlightbackground=FG_DIM, highlightcolor="#2563EB", relief="flat", bd=4)
+        subject_entry.pack()
 
-        tk.Label(container, text="Session Notes (optional):", fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 14)).pack(anchor="w", pady=(10, 5))
-        notes_text = tk.Text(container, height=6, font=("Segoe UI", 14), bg="#2B2B2B", fg=FG_TEXT, insertbackground=FG_TEXT, highlightbackground=FG_DIM, highlightcolor="#2563EB", relief="flat", bd=4, wrap="word")
-        notes_text.pack(fill="x", pady=(0, 30))
+        notes_frame = tk.Frame(container, bg=BG_MAIN)
+        notes_frame.pack(pady=(0, 30))
+        tk.Label(notes_frame, text="Session Notes (optional):", fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 14)).pack(anchor="w", pady=(0, 5))
+        notes_text = tk.Text(notes_frame, width=65, height=6, font=("Segoe UI", 14), bg="#2B2B2B", fg=FG_TEXT, insertbackground=FG_TEXT, highlightbackground=FG_DIM, highlightcolor="#2563EB", relief="flat", bd=4, wrap="word")
+        notes_text.pack()
 
-        btn_row = tk.Frame(container, bg=BG_MAIN)
-        btn_row.pack()
+        # BUTTON ROW: Use a single centered frame, then place buttons inside it
+        btn_wrapper = tk.Frame(container, bg=BG_MAIN)
+        btn_wrapper.pack(anchor="center", pady=(10, 0))
 
-        # Placeholders for ✓ and X
-        ctk.CTkButton(btn_row, text="✓", width=40, height=40, fg_color="transparent", border_width=2, cursor="hand2").pack(side="left", padx=5)
-        ctk.CTkButton(btn_row, text="X", width=40, height=40, fg_color="transparent", border_width=2, cursor="hand2").pack(side="left", padx=5)
+        # Container for the smaller left buttons
+        left_btns = tk.Frame(btn_wrapper, bg=BG_MAIN)
+        left_btns.pack(side="left", padx=(0, 10))
+        ctk.CTkButton(left_btns, text="✓", width=40, height=40, fg_color="transparent", border_width=2, cursor="hand2").pack(side="left", padx=5)
+        ctk.CTkButton(left_btns, text="X", width=40, height=40, fg_color="transparent", border_width=2, cursor="hand2").pack(side="left", padx=5)
+
+        # Container for the main Submit/Cancel buttons
+        center_btns = tk.Frame(btn_wrapper, bg=BG_MAIN)
+        center_btns.pack(side="left")
 
         def do_cancel():
             self.transition_to(self.build_main_hub, game)
@@ -2033,7 +2041,6 @@ class GameLedgerApp(ctk.CTk):
             subj = subject_entry.get().strip()
             notes = notes_text.get("1.0", "end").strip()
             
-            # Post session to DB (automatically moves game to In Progress)
             self.session_service.log_play_session(
                 game_id=game.id,
                 date=today_str,
@@ -2041,15 +2048,17 @@ class GameLedgerApp(ctk.CTk):
                 subject=subj,
                 notes=notes
             )
-            # Set flag so accordion auto-scrolls to the bottom upon return
             self._scroll_to_bottom_pending = True
             self.transition_to(self.build_main_hub, game)
 
         def prompt_submit():
             self._show_modal_popup("Submit?", main_bg, do_submit)
 
-        ctk.CTkButton(btn_row, text="Submit", width=120, height=40, fg_color=TIMER_PLAY_GREEN, hover_color=TIMER_PLAY_GREEN_HOVER, cursor="hand2", font=("Segoe UI", 14, "bold"), command=prompt_submit).pack(side="left", padx=10)
-        ctk.CTkButton(btn_row, text="Cancel", width=120, height=40, fg_color="#737373", hover_color="#525252", cursor="hand2", font=("Segoe UI", 14, "bold"), command=prompt_cancel).pack(side="left", padx=10)
+        ctk.CTkButton(center_btns, text="Submit", width=120, height=40, fg_color=TIMER_PLAY_GREEN, hover_color=TIMER_PLAY_GREEN_HOVER, cursor="hand2", font=("Segoe UI", 14, "bold"), command=prompt_submit).pack(side="left", padx=10)
+        ctk.CTkButton(center_btns, text="Cancel", width=120, height=40, fg_color="#737373", hover_color="#525252", cursor="hand2", font=("Segoe UI", 14, "bold"), command=prompt_cancel).pack(side="left", padx=10)
+
+        self.update_idletasks()
+        self.update()
 
     def _show_modal_popup(self, text, parent, on_yes):
         # B12-B14 & B16: Native overlay that blocks all clicks to the form behind it
