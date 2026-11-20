@@ -8,3 +8,4 @@ class PlaySession:
     subject: str = ""
     notes: str = ""
     id: int | None = None
+    duration_seconds: float = 0.0

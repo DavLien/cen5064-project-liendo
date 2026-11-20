@@ -160,15 +160,22 @@ class SqliteSessionRepository(SessionRepository):
                     FOREIGN KEY(game_id) REFERENCES games(id) ON DELETE CASCADE
                 )
             """)
+            
+            # Safe Database Auto-Migration for exact Stopwatch precision
+            cursor.execute("PRAGMA table_info(play_sessions)")
+            cols = [row[1] for row in cursor.fetchall()]
+            if "duration_seconds" not in cols:
+                conn.execute("ALTER TABLE play_sessions ADD COLUMN duration_seconds REAL DEFAULT 0.0")
+                
             conn.commit()
 
     def save_session(self, session: PlaySession) -> PlaySession:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO play_sessions (game_id, date, duration_hours, subject, notes)
-                VALUES (?, ?, ?, ?, ?)
-            """, (session.game_id, session.date, session.duration_hours, session.subject, session.notes))
+                INSERT INTO play_sessions (game_id, date, duration_hours, subject, notes, duration_seconds)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (session.game_id, session.date, session.duration_hours, session.subject, session.notes, session.duration_seconds))
             
             conn.commit()
             session.id = cursor.lastrowid
@@ -180,7 +187,7 @@ class SqliteSessionRepository(SessionRepository):
             cursor = conn.cursor()
             # Fetches in descending order so the newest sessions appear at the top of the UI accordion
             cursor.execute("""
-                SELECT id, game_id, date, duration_hours, subject, notes 
+                SELECT id, game_id, date, duration_hours, subject, notes, duration_seconds 
                 FROM play_sessions 
                 WHERE game_id = ?
                 ORDER BY id DESC
@@ -194,6 +201,7 @@ class SqliteSessionRepository(SessionRepository):
                     date=row[2],
                     duration_hours=row[3],
                     subject=row[4],
-                    notes=row[5]
+                    notes=row[5],
+                    duration_seconds=row[6]
                 ))
             return sessions
