@@ -24,15 +24,26 @@ class CatalogService:
             raise ValueError(f"Catalog item with ID '{catalog_id}' not found.")
 
         title = catalog_record.get("title", "Unknown Title")
+        platform_str = platform.strip()
 
-        if self.game_repo.is_game_in_backlog(title, platform.strip()):
-            raise ValueError("You've already added this game.")
+        # Check if the game is already in our database (either active or archived)
+        all_games = self.game_repo.get_all_games()
+        for g in all_games:
+            if g.title == title and g.platform == platform_str:
+                if g.status.startswith("Archived_"):
+                    # RESTORE the archived game to its exact previous library (keeps session data intact!)
+                    g.status = g.status.replace("Archived_", "")
+                    self.game_repo.update_game(g)
+                    return g
+                else:
+                    raise ValueError("You've already added this game.")
 
+        # If it's a completely new game, add it to Backlog
         game = Game(
             title=title,
-            platform=platform.strip(),
+            platform=platform_str,
             game_modes=catalog_record.get("game_modes", []),
-            status="Backlog"
+            status="Backlog",
         )
         return self.game_repo.save_game(game)
 
@@ -44,3 +55,41 @@ class CatalogService:
         if mode == "All":
             return all_games
         return [g for g in all_games if mode in g.get("game_modes", [])]
+
+    def get_backlog(self) -> list[Game]:
+        # Only fetch active games to populate the sidebar (hides archived games)
+        return [
+            g
+            for g in self.game_repo.get_all_games()
+            if not g.status.startswith("Archived_")
+        ]
+
+    def remove_game(self, game_id: int):
+        """
+        If in Backlog (no sessions), completely delete.
+        Otherwise, archive the status so sessions are preserved and it restores exactly where it left off.
+        """
+        game = self.game_repo.get_game(game_id)
+        if not game:
+            return
+
+        if game.status == "Backlog":
+            self.game_repo.delete_game(game_id)
+        else:
+            game.status = "Archived_" + game.status
+            self.game_repo.update_game(game)
+
+    def get_catalog_details_by_title(self, title: str) -> dict[str, Any]:
+        for item in self.catalog_repo.get_all_catalog():
+            if item.get("title", "").lower() == title.lower():
+                return item
+        return {}
+
+    def update_game_status(self, game_id: int, new_status: str):
+        """
+        Updates the library status of a game (e.g., moving it to 'Backlog').
+        """
+        game = self.game_repo.get_game(game_id)
+        if game:
+            game.status = new_status
+            self.game_repo.update_game(game)

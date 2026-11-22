@@ -24,7 +24,7 @@ class TestCatalogService(unittest.TestCase):
     def test_add_game_to_backlog_success(self):
         self.catalog_repo.get_catalog_item.return_value = {
             "title": "Hades",
-            "game_modes": ["Single-Player"]
+            "game_modes": ["Single-Player"],
         }
         self.game_repo.is_game_in_backlog.return_value = False
 
@@ -32,14 +32,14 @@ class TestCatalogService(unittest.TestCase):
         def mock_save(game: Game) -> Game:
             game.id = 42
             return game
-            
+
         self.game_repo.save_game.side_effect = mock_save
 
         saved_game = self.service.add_game_to_backlog("cat_789", "PC")
 
         self.catalog_repo.get_catalog_item.assert_called_once_with("cat_789")
         self.game_repo.save_game.assert_called_once()
-        
+
         self.assertEqual(saved_game.title, "Hades")
         self.assertEqual(saved_game.platform, "PC")
         self.assertEqual(saved_game.game_modes, ["Single-Player"])
@@ -47,15 +47,19 @@ class TestCatalogService(unittest.TestCase):
         self.assertEqual(saved_game.id, 42)
 
     def test_add_game_requires_platform(self):
-        with self.assertRaisesRegex(ValueError, "platform version must be explicitly selected"):
+        with self.assertRaisesRegex(
+            ValueError, "platform version must be explicitly selected"
+        ):
             self.service.add_game_to_backlog("cat_789", "")
-            
-        with self.assertRaisesRegex(ValueError, "platform version must be explicitly selected"):
+
+        with self.assertRaisesRegex(
+            ValueError, "platform version must be explicitly selected"
+        ):
             self.service.add_game_to_backlog("cat_789", None)
 
     def test_add_game_invalid_catalog_id_raises_error(self):
         self.catalog_repo.get_catalog_item.return_value = None
-        
+
         with self.assertRaisesRegex(ValueError, "not found"):
             self.service.add_game_to_backlog("invalid_id", "PS5")
 
@@ -64,10 +68,11 @@ class TestCatalogService(unittest.TestCase):
     def test_add_game_handles_missing_json_keys(self):
         self.catalog_repo.get_catalog_item.return_value = {}
         self.game_repo.is_game_in_backlog.return_value = False
-        
+
         def mock_save(game: Game) -> Game:
             game.id = 99
             return game
+
         self.game_repo.save_game.side_effect = mock_save
 
         saved_game = self.service.add_game_to_backlog("cat_corrupt", "Xbox")
@@ -75,6 +80,7 @@ class TestCatalogService(unittest.TestCase):
         self.assertEqual(saved_game.title, "Unknown Title")
         self.assertEqual(saved_game.game_modes, [])
         self.assertEqual(saved_game.platform, "Xbox")
+
 
 if __name__ == "__main__":
     unittest.main()
