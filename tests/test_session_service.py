@@ -30,7 +30,7 @@ class TestSessionService(unittest.TestCase):
         self.mock_session_repo.save_session.side_effect = mock_save_session
 
         result = self.service.log_play_session(
-            1, "November 16, 2026", 2.5, "Boss Fight", "Defeated Margit"
+            1, "November 16, 2026", 2.5 * 3600, "Boss Fight", "Defeated Margit"
         )
 
         self.assertEqual(game.total_hours, 7.5)
@@ -51,11 +51,11 @@ class TestSessionService(unittest.TestCase):
         )
         self.mock_game_repo.get_game.return_value = game
         self.mock_session_repo.save_session.return_value = PlaySession(
-            game_id=2, date="Nov 16", duration_hours=0.01
+            game_id=2, date="Nov 16", duration_seconds=36, duration_hours=0.01
         )
 
         # Act
-        self.service.log_play_session(game_id=2, date="Nov 16", duration_hours=0.01)
+        self.service.log_play_session(game_id=2, date="Nov 16", duration_seconds=36)
 
         # Assert: Use assertAlmostEqual for float validation
         self.assertAlmostEqual(game.total_hours, 40.34, places=2)
@@ -64,12 +64,12 @@ class TestSessionService(unittest.TestCase):
     def test_log_play_session_invalid_duration_raises_error(self):
         with self.assertRaisesRegex(ValueError, "greater than zero"):
             self.service.log_play_session(
-                game_id=1, date="November 16, 2026", duration_hours=0.0
+                game_id=1, date="November 16, 2026", duration_seconds=0.0
             )
 
     def test_log_play_session_game_not_found_raises_error(self):
         self.mock_game_repo.get_game.return_value = None
         with self.assertRaisesRegex(ValueError, "not found"):
             self.service.log_play_session(
-                game_id=999, date="November 16, 2026", duration_hours=1.0
+                game_id=999, date="November 16, 2026", duration_seconds=1.0
             )
