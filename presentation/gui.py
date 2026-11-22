@@ -70,6 +70,48 @@ def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
     h = hex_color.lstrip("#")
     return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
 
+class ToolTip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tipwindow = None
+        self.id = None
+        self.widget.bind("<Enter>", self.enter, add="+")
+        self.widget.bind("<Leave>", self.leave, add="+")
+        self.widget.bind("<ButtonPress>", self.leave, add="+")
+
+    def enter(self, event=None):
+        self.schedule()
+
+    def leave(self, event=None):
+        self.unschedule()
+        self.hidetip()
+
+    def schedule(self):
+        self.unschedule()
+        self.id = self.widget.after(300, self.showtip)
+
+    def unschedule(self):
+        if self.id:
+            self.widget.after_cancel(self.id)
+            self.id = None
+
+    def showtip(self, event=None):
+        x = y = 0
+        x, y, cx, cy = self.widget.bbox("insert")
+        x += self.widget.winfo_rootx() + 20
+        y += self.widget.winfo_rooty() + 20
+        self.tipwindow = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        
+        label = tk.Label(tw, text=self.text, justify="left", background="#1E1E1E", fg="#DCE4EE", relief="solid", borderwidth=1, font=("Segoe UI", 9))
+        label.pack(ipadx=4, ipady=2)
+
+    def hidetip(self):
+        if self.tipwindow:
+            self.tipwindow.destroy()
+            self.tipwindow = None
 
 class GameLedgerApp(ctk.CTk):
     SETTINGS_PATH = Path("data/ui_settings.json")
@@ -124,6 +166,23 @@ class GameLedgerApp(ctk.CTk):
         self._timer_rendered_sizes: dict[str, int] = {}
         self._timer_hovered_btn: str | None = None
         self._timer_btn_geom: dict[str, tuple[float, float, float]] = {}
+
+        # Pre-load custom Edit Icon and tint it so it isn't invisible on dark mode
+        self._edit_icon_img = None
+        if Path("Edit Icon.png").exists() and HAS_PIL:
+            try:
+                img = Image.open("Edit Icon.png").convert("RGBA")
+                data = img.getdata()
+                new_data = []
+                for item in data:
+                    if item[0] < 50 and item[1] < 50 and item[2] < 50 and item[3] > 0:
+                        new_data.append((220, 228, 238, item[3]))
+                    else:
+                        new_data.append(item)
+                img.putdata(new_data)
+                self._edit_icon_img = ctk.CTkImage(light_image=img, size=(16, 16))
+            except Exception:
+                pass
 
         # Fetch actual database on startup
         self.backlog_games = self.service.get_backlog()
@@ -950,6 +1009,10 @@ class GameLedgerApp(ctk.CTk):
         general_release = details.get("general_release", "N/A")
         desc = details.get("description", "No description available for this title yet.")
 
+        # Fetch sessions early to evaluate if the Wipe button should be disabled
+        sessions = self.session_service.get_sessions_for_game(game.id)
+        has_sessions = len(sessions) > 0
+
         # B5: Both "+ New Session" buttons launch the Game Timer screen for this game
         def start_new_session(g=game):
             self.after(10, self.transition_to, self.build_timer_screen, g)
@@ -1045,34 +1108,66 @@ class GameLedgerApp(ctk.CTk):
         )
         dots_btn.pack(side="left", padx=2)
 
-        self.remove_btn = ctk.CTkButton(
-            details_inner,
-            text="Remove",
-            fg_color="red",
-            hover_color="darkred",
-            cursor="hand2",
-            command=lambda: self.execute_remove_game(game.id),
-            width=242,
-        )
+        # The Custom Menu Container
+        self.dots_menu = tk.Frame(details_inner, bg=BG_HOVER, highlightbackground=FG_DIM, highlightthickness=1)
 
-        def toggle_remove():
-            if self.remove_btn.winfo_ismapped():
-                self.remove_btn.place_forget()
+        def toggle_dots_menu():
+            if self.dots_menu.winfo_ismapped():
+                self.dots_menu.place_forget()
             else:
                 self.update_idletasks()
-                # Reverse CustomTkinter's automatic High-DPI scaling multiplication
-                scale = self.remove_btn._get_widget_scaling()
+                scale = dots_btn._get_widget_scaling()
                 x = (btn_row.winfo_rootx() - details_inner.winfo_rootx()) / scale
-                y = (
-                    btn_row.winfo_rooty() 
-                    - details_inner.winfo_rooty() 
-                    + btn_row.winfo_height() 
-                    + 6
-                ) / scale
-                self.remove_btn.place(x=x, y=y)
-                self.remove_btn.lift()
+                y = (btn_row.winfo_rooty() - details_inner.winfo_rooty() + btn_row.winfo_height() + 6) / scale
+                self.dots_menu.place(x=x, y=y)
+                self.dots_menu.lift()
 
-        dots_btn.configure(command=toggle_remove)
+        dots_btn.configure(command=toggle_dots_menu)
+
+        # --- Wipe Data Action[cite: 30, 31] ---
+        def do_wipe():
+            # Requires your service layers to support these calls:
+            self.session_service.delete_all_sessions_for_game(game.id)
+            self.service.update_game_status(game.id, "Backlog")
+            game.status = "Backlog"
+            self.render_sidebar()
+            self.render_inline_game_details(game)
+
+        def prompt_wipe():
+            self.dots_menu.place_forget()
+            self._show_modal_popup(
+                "Are you Sure?", 
+                "(This will permanently delete your data for this game.)", 
+                do_wipe
+            )
+
+        # --- Archival Remove Action ---
+        def do_remove():
+            self.dots_menu.place_forget()
+            self.execute_remove_game(game.id)
+
+        def prompt_remove():
+            self.dots_menu.place_forget()
+            # INSTANT REMOVE if in Backlog (no sessions exist), otherwise prompt with modal
+            if game.status == "Backlog":
+                do_remove()
+            else:
+                self._show_modal_popup(
+                    "Are you Sure?", 
+                    "(This will remove the game from your library, but your data will be saved.)", 
+                    do_remove
+                )
+
+        # Build the menu items
+        wipe_state = "normal" if has_sessions else "disabled"
+        wipe_color = FG_TEXT if has_sessions else FG_DIM
+
+        # WIDENED buttons to 245 to perfectly match the width of the 4 above buttons
+        btn_remove_menu = ctk.CTkButton(self.dots_menu, text="Remove", fg_color="transparent", text_color=FG_TEXT, hover_color=BG_SELECTED, corner_radius=0, width=245, anchor="w", command=prompt_remove)
+        btn_remove_menu.pack(fill="x", pady=(2, 1), padx=2)
+
+        btn_wipe_menu = ctk.CTkButton(self.dots_menu, text="Permanently Wipe Data", fg_color="transparent", text_color=wipe_color, hover_color=BG_SELECTED, corner_radius=0, width=245, anchor="w", state=wipe_state, command=prompt_wipe)
+        btn_wipe_menu.pack(fill="x", pady=(1, 2), padx=2)
 
         # ---------------------------------------------
         # MIDDLE ROW: Description + Full Details
@@ -1145,66 +1240,144 @@ class GameLedgerApp(ctk.CTk):
             anchor="w",
         ).pack(fill="x", pady=(0, 8))
 
-        # Dynamically render all submitted sessions for this game
-        sessions = self.session_service.get_sessions_for_game(game.id)
-        for session in sessions:
-            has_subj = bool(session.subject.strip())
-            has_notes = bool(session.notes.strip())
+        # By wrapping row generation in a function, Python is forced to isolate 
+        # the variables so no rows ever overwrite or glitch each other.
+        def build_session_row(session_obj):
+            has_subj = bool(session_obj.subject.strip())
+            has_notes = bool(session_obj.notes.strip())
             is_clickable = has_subj or has_notes
 
             row_container = tk.Frame(progress_section, bg=BG_MAIN)
             row_container.pack(fill="x", pady=2)
 
-            main_row = tk.Frame(row_container, bg=BG_MAIN, cursor="hand2" if is_clickable else "")
-            main_row.pack(fill="x", pady=4)
+            main_row = ctk.CTkFrame(row_container, fg_color=BG_MAIN, corner_radius=8, cursor="hand2" if is_clickable else "")
+            main_row.pack(fill="x", ipady=8, padx=4)
 
             left_f = tk.Frame(main_row, bg=BG_MAIN)
-            left_f.pack(side="left")
+            left_f.pack(side="left", padx=(10, 0))
             
-            # Blue dot for now (will adapt to green/red in future updates)
             tk.Label(left_f, text="●", fg="#2563EB", bg=BG_MAIN, font=self._sidebar_dot_font).pack(side="left", padx=(0, 6))
-            tk.Label(left_f, text=session.date, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 11)).pack(side="left")
+            tk.Label(left_f, text=session_obj.date, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 11)).pack(side="left")
 
             arrow_lbl = None
             if is_clickable:
                 arrow_lbl = tk.Label(left_f, text=">", fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 10, "bold"))
                 arrow_lbl.pack(side="left", padx=(8, 0))
 
-            s_main, s_ms = self._format_stopwatch(session.duration_seconds)
             right_f = tk.Frame(main_row, bg=BG_MAIN)
-            right_f.pack(side="right")
-            tk.Label(right_f, text=s_ms, fg=FG_MUTED, bg=BG_MAIN, font=("Segoe UI", 9)).pack(side="right", anchor="s", pady=(0, 1))
-            tk.Label(right_f, text=s_main, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 11)).pack(side="right", anchor="s")
+            right_f.pack(side="right", padx=(0, 10))
+
+            actions_f = tk.Frame(right_f, bg=BG_MAIN)
+            
+            edit_btn = ctk.CTkButton(actions_f, image=self._edit_icon_img, text="" if self._edit_icon_img else "✎", width=28, height=28, fg_color="transparent", hover_color=BG_SELECTED, text_color=FG_TEXT, cursor="hand2", command=lambda: self.transition_to(self.build_session_edit_screen, game, session_obj))
+            edit_btn.pack(side="left", padx=(0, 4))
+            ToolTip(edit_btn, "Edit")
+
+            def on_delete_session():
+                self.session_service.delete_play_session(session_obj.id, game.id)
+                # If that was the last session, update UI memory and shift it to the Backlog natively
+                if len(self.session_service.get_sessions_for_game(game.id)) == 0:
+                    game.status = "Backlog"
+                    self.render_sidebar()
+                self.render_inline_game_details(game)
+
+            delete_btn = ctk.CTkButton(actions_f, text="X", width=28, height=28, fg_color="transparent", hover_color=TIMER_STOP_RED_HOVER, text_color=TIMER_STOP_RED, cursor="hand2", command=on_delete_session)
+            delete_btn.pack(side="left", padx=(0, 8))
+            ToolTip(delete_btn, "Delete")
+
+            s_main, s_ms = self._format_stopwatch(session_obj.duration_seconds)
+            time_lbl_ms = tk.Label(right_f, text=s_ms, fg=FG_MUTED, bg=BG_MAIN, font=("Segoe UI", 9))
+            time_lbl_ms.pack(side="right", anchor="s", pady=(0, 1))
+            time_lbl_main = tk.Label(right_f, text=s_main, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 11))
+            time_lbl_main.pack(side="right", anchor="s")
 
             details_f = tk.Frame(row_container, bg=BG_MAIN)
             if has_subj:
                 tk.Label(details_f, text="Subject", fg=FG_DIM, bg=BG_MAIN, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=(22, 0), pady=(4, 0))
-                s_lbl = tk.Label(details_f, text=session.subject, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 10), justify="left", wraplength=400)
+                s_lbl = tk.Label(details_f, text=session_obj.subject, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 10), justify="left", wraplength=400)
                 s_lbl.pack(anchor="w", padx=(22, 0), pady=(0, 6))
                 self._accordion_labels.append(s_lbl)
             if has_notes:
                 tk.Label(details_f, text="Notes", fg=FG_DIM, bg=BG_MAIN, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=(22, 0), pady=(4, 0))
-                n_lbl = tk.Label(details_f, text=session.notes, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 10), justify="left", wraplength=400)
+                n_lbl = tk.Label(details_f, text=session_obj.notes, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 10), justify="left", wraplength=400)
                 n_lbl.pack(anchor="w", padx=(22, 0), pady=(0, 6))
                 self._accordion_labels.append(n_lbl)
 
-            tk.Frame(progress_section, height=1, bg=BG_DIVIDER).pack(fill="x", pady=(2, 6))
+            # Restored the transparent separator line with perfect spacing
+            tk.Frame(progress_section, height=1, bg=BG_DIVIDER).pack(fill="x", pady=(4, 8))
 
+            state = {"expanded": False}
+            
+            # Helper to uniformly apply background color to the row and its inner labels
+            def set_bg(color):
+                main_row.configure(fg_color=color)
+                left_f.configure(bg=color)
+                right_f.configure(bg=color)
+                actions_f.configure(bg=color) # FIXED: Removes the black box around the buttons
+                for w in left_f.winfo_children() + right_f.winfo_children():
+                    if w is not actions_f and not isinstance(w, ctk.CTkButton):
+                        w.configure(bg=color)
+
+            def on_enter(e):
+                set_bg(BG_HOVER)
+                actions_f.pack(side="left", before=time_lbl_main)
+                
+            def on_leave(e):
+                # FIXED: Uses a micro-delay to check pointer coordinates so rapid sweeping doesn't glitch
+                def check_leave():
+                    if not main_row.winfo_exists(): return
+                    if not self._is_pointer_inside(main_row):
+                        if not state["expanded"]:
+                            set_bg(BG_MAIN)
+                            actions_f.pack_forget()
+                self.after(20, check_leave)
+
+            # Deep bind hover events to everything inside the row
+            def bind_hover(widget):
+                widget.bind("<Enter>", on_enter, add="+")
+                widget.bind("<Leave>", on_leave, add="+")
+                for c in widget.winfo_children():
+                    if not isinstance(c, ctk.CTkButton):
+                        bind_hover(c)
+            
+            bind_hover(main_row)
+            
             if is_clickable:
-                def _toggle_accordion(e, df=details_f, al=arrow_lbl):
-                    if df.winfo_ismapped():
-                        df.pack_forget()
-                        al.configure(text=">")
+                def toggle(e):
+                    # Prevent toggle if clicking on action buttons
+                    if self._is_pointer_inside(edit_btn) or self._is_pointer_inside(delete_btn):
+                        return
+                    
+                    state["expanded"] = not state["expanded"]
+                    if state["expanded"]:
+                        details_f.pack(fill="x", pady=(0, 6))
+                        arrow_lbl.configure(text="v")
+                        set_bg(BG_HOVER)
+                        actions_f.pack(side="left", before=time_lbl_main)
                     else:
-                        df.pack(fill="x", pady=(0, 6))
-                        al.configure(text="v")
-                    _sync_scrollregion()
-
-                main_row.bind("<Button-1>", _toggle_accordion)
-                for w in main_row.winfo_children():
-                    w.bind("<Button-1>", _toggle_accordion)
+                        details_f.pack_forget()
+                        arrow_lbl.configure(text=">")
+                        if not self._is_pointer_inside(main_row):
+                            set_bg(BG_MAIN)
+                            actions_f.pack_forget()
+                    
+                    if details_canvas.winfo_exists():
+                        details_canvas.configure(scrollregion=details_canvas.bbox("all"))
+                
+                # Bind click recursively to all non-button elements inside main_row
+                def bind_click(w):
+                    # Skip action buttons entirely so they click freely
+                    if w is actions_f or w.master is actions_f or isinstance(w, ctk.CTkButton):
+                        return
+                    w.bind("<Button-1>", toggle)
                     for child in w.winfo_children():
-                        child.bind("<Button-1>", _toggle_accordion)
+                        bind_click(child)
+                        
+                bind_click(main_row)
+
+        # Execute the function for every session to guarantee isolated scope
+        for session in sessions:
+            build_session_row(session)
 
         ctk.CTkButton(
             progress_section,
@@ -1956,7 +2129,7 @@ class GameLedgerApp(ctk.CTk):
         )
 
     # ==========================================
-    #    STEP 4: SUBMISSION SCREEN (B11-B17)
+    #    SUBMISSION SCREEN (B11-B17)
     # ==========================================
     def build_session_submission_screen(self, game, recorded_seconds: float):
         self._cancel_hover_overlay()
@@ -1968,118 +2141,310 @@ class GameLedgerApp(ctk.CTk):
         for widget in self.winfo_children():
             widget.destroy()
 
-        # Pack main_bg to fill the entire window (keeps the fix for the black screen delay)
+        # Fill the entire window natively to completely kill the black screen bug
         main_bg = tk.Frame(self, bg=BG_MAIN, highlightthickness=0, bd=0)
         main_bg.pack(fill="both", expand=True)
 
-        # Tightly wrapped container that floats dead-center vertically and horizontally
+        # The container dynamically takes up 90% of the screen width and floats dead center
         container = tk.Frame(main_bg, bg=BG_MAIN, highlightthickness=0, bd=0)
-        container.place(relx=0.5, rely=0.5, anchor="center")
+        container.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.90)
 
-        # 3-column header using grid with 'uniform' to enforce exact 33.3% distribution
+        # Dynamic CTkFonts for smooth scaling
+        self._sub_f_title = ctk.CTkFont(family="Segoe UI", size=16)
+        self._sub_f_game = ctk.CTkFont(family="Segoe UI", size=22, weight="bold")
+        self._sub_f_time = ctk.CTkFont(family="Segoe UI", size=56, weight="bold")
+        self._sub_f_ms = ctk.CTkFont(family="Segoe UI", size=26, weight="bold")
+        self._sub_f_input = ctk.CTkFont(family="Segoe UI", size=14)
+        self._sub_f_btn = ctk.CTkFont(family="Segoe UI", size=15, weight="bold")
+
+        # 3-column header using grid to enforce exact 33.3% distribution
         header = tk.Frame(container, bg=BG_MAIN)
         header.pack(fill="x", pady=(0, 40))
         header.grid_columnconfigure((0, 1, 2), weight=1, uniform="col")
 
-        # Game Column (Perfectly Centered)
-        g_frame = tk.Frame(header, bg=BG_MAIN)
-        g_frame.grid(row=0, column=0, sticky="nsew")
-        tk.Label(g_frame, text="Game:", fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 16)).pack(anchor="center")
-        tk.Label(g_frame, text=game.title, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 16, "bold"), wraplength=250, justify="center").pack(anchor="center", pady=(5,0))
+        # ROW 0: TITLES (sticky="s" forces them to sit perfectly on a single horizontal baseline)
+        tk.Label(header, text="Game:", fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_title).grid(row=0, column=0, sticky="s")
+        tk.Label(header, text="Session Time:", fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_title).grid(row=0, column=1, sticky="s")
+        tk.Label(header, text="Session Date:", fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_title).grid(row=0, column=2, sticky="s")
 
-        # Time Column (Perfectly Centered)
-        t_frame = tk.Frame(header, bg=BG_MAIN)
-        t_frame.grid(row=0, column=1, sticky="nsew")
-        tk.Label(t_frame, text="Session Time:", fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 16)).pack(anchor="center")
+        # ROW 1: VALUES (Removed sticky="n" so they vertically center with the giant Time font)
+        sub_lbl_game = tk.Label(header, text=game.title, fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_game, wraplength=280, justify="center")
+        sub_lbl_game.grid(row=1, column=0, pady=(15,0))
+
         main_str, ms_str = self._format_stopwatch(recorded_seconds)
-        time_val_frame = tk.Frame(t_frame, bg=BG_MAIN)
-        time_val_frame.pack(anchor="center", pady=(5,0))
-        tk.Label(time_val_frame, text=main_str, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 36, "bold")).pack(side="left", anchor="s")
-        tk.Label(time_val_frame, text=ms_str, fg=FG_MUTED, bg=BG_MAIN, font=("Segoe UI", 18, "bold")).pack(side="left", anchor="s", pady=(0, 6))
+        time_val_frame = tk.Frame(header, bg=BG_MAIN)
+        time_val_frame.grid(row=1, column=1, pady=(15,0))
+        sub_lbl_time = tk.Label(time_val_frame, text=main_str, fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_time)
+        sub_lbl_time.pack(side="left", anchor="s")
+        sub_lbl_ms = tk.Label(time_val_frame, text=ms_str, fg=FG_MUTED, bg=BG_MAIN, font=self._sub_f_ms)
+        sub_lbl_ms.pack(side="left", anchor="s", pady=(0, 8))
 
-        # Date Column (Perfectly Centered)
-        d_frame = tk.Frame(header, bg=BG_MAIN)
-        d_frame.grid(row=0, column=2, sticky="nsew")
-        tk.Label(d_frame, text="Session Date:", fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 16)).pack(anchor="center")
         today_str = datetime.now().strftime("%B %d, %Y")
-        tk.Label(d_frame, text=today_str, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 16, "bold")).pack(anchor="center", pady=(5,0))
+        sub_lbl_date = tk.Label(header, text=today_str, fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_game)
+        sub_lbl_date.grid(row=1, column=2, pady=(15,0))
 
-        # Form Inputs (Using fixed character width to establish a solid, consistent rectangle)
+        # FORM INPUTS (Dynamically stretch to exactly match the container's 90% width)
         subj_frame = tk.Frame(container, bg=BG_MAIN)
-        subj_frame.pack(pady=(10, 20))
-        tk.Label(subj_frame, text="Session Subject (optional):", fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 14)).pack(anchor="w", pady=(0, 5))
-        subject_entry = tk.Entry(subj_frame, width=65, font=("Segoe UI", 14), bg="#2B2B2B", fg=FG_TEXT, insertbackground=FG_TEXT, highlightbackground=FG_DIM, highlightcolor="#2563EB", relief="flat", bd=4)
-        subject_entry.pack()
+        subj_frame.pack(fill="x", pady=(10, 20))
+        tk.Label(subj_frame, text="Session Subject (optional):", fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_input).pack(anchor="w", pady=(0, 5))
+        subject_entry = tk.Entry(subj_frame, font=self._sub_f_input, bg="#2B2B2B", fg=FG_TEXT, insertbackground=FG_TEXT, highlightbackground=FG_DIM, highlightcolor="#2563EB", relief="flat", bd=4)
+        subject_entry.pack(fill="x", ipady=4)
 
         notes_frame = tk.Frame(container, bg=BG_MAIN)
-        notes_frame.pack(pady=(0, 30))
-        tk.Label(notes_frame, text="Session Notes (optional):", fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 14)).pack(anchor="w", pady=(0, 5))
-        notes_text = tk.Text(notes_frame, width=65, height=6, font=("Segoe UI", 14), bg="#2B2B2B", fg=FG_TEXT, insertbackground=FG_TEXT, highlightbackground=FG_DIM, highlightcolor="#2563EB", relief="flat", bd=4, wrap="word")
-        notes_text.pack()
+        notes_frame.pack(fill="x", pady=(0, 30))
+        tk.Label(notes_frame, text="Session Notes (optional):", fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_input).pack(anchor="w", pady=(0, 5))
+        # Height increased to 9 for a taller text box
+        notes_text = tk.Text(notes_frame, height=9, font=self._sub_f_input, bg="#2B2B2B", fg=FG_TEXT, insertbackground=FG_TEXT, highlightbackground=FG_DIM, highlightcolor="#2563EB", relief="flat", bd=4, wrap="word")
+        notes_text.pack(fill="x")
 
-        # BUTTON ROW: Use a single centered frame, then place buttons inside it
-        btn_wrapper = tk.Frame(container, bg=BG_MAIN)
-        btn_wrapper.pack(anchor="center", pady=(10, 0))
+        # BULLETPROOF CENTERED BUTTONS (Gap between Submit & Cancel locked to dead center)
+        btn_row = tk.Frame(container, bg=BG_MAIN)
+        btn_row.pack(fill="x", pady=(10, 0))
+        btn_row.grid_columnconfigure(0, weight=1, uniform="btn_half")
+        btn_row.grid_columnconfigure(1, weight=1, uniform="btn_half")
 
-        # Container for the smaller left buttons
-        left_btns = tk.Frame(btn_wrapper, bg=BG_MAIN)
-        left_btns.pack(side="left", padx=(0, 10))
-        ctk.CTkButton(left_btns, text="✓", width=40, height=40, fg_color="transparent", border_width=2, cursor="hand2").pack(side="left", padx=5)
-        ctk.CTkButton(left_btns, text="X", width=40, height=40, fg_color="transparent", border_width=2, cursor="hand2").pack(side="left", padx=5)
+        # Left Column (Hugs the center gap, holds Check, X, and Submit)
+        left_side = tk.Frame(btn_row, bg=BG_MAIN)
+        left_side.grid(row=0, column=0, sticky="e", padx=(0, 5))
+        
+        btn_chk = ctk.CTkButton(left_side, text="✓", width=40, height=40, fg_color="transparent", border_width=2, cursor="hand2")
+        btn_chk.pack(side="left", padx=(0, 8))
+        
+        btn_x = ctk.CTkButton(left_side, text="X", width=40, height=40, fg_color="transparent", border_width=2, cursor="hand2")
+        btn_x.pack(side="left", padx=(0, 16))
 
-        # Container for the main Submit/Cancel buttons
-        center_btns = tk.Frame(btn_wrapper, bg=BG_MAIN)
-        center_btns.pack(side="left")
+        def prompt_submit(): self._show_modal_popup("Submit?", None, do_submit)
+        btn_submit = ctk.CTkButton(left_side, text="Submit", width=120, height=40, fg_color=TIMER_PLAY_GREEN, hover_color=TIMER_PLAY_GREEN_HOVER, cursor="hand2", font=self._sub_f_btn, command=prompt_submit)
+        btn_submit.pack(side="left")
+
+        # Right Column (Hugs the center gap, holds Cancel)
+        right_side = tk.Frame(btn_row, bg=BG_MAIN)
+        right_side.grid(row=0, column=1, sticky="w", padx=(5, 0))
+
+        def prompt_cancel(): self._show_modal_popup("Are You Sure?", None, do_cancel)
+        btn_cancel = ctk.CTkButton(right_side, text="Cancel", width=120, height=40, fg_color="#737373", hover_color="#525252", cursor="hand2", font=self._sub_f_btn, command=prompt_cancel)
+        btn_cancel.pack(side="left")
+
+        # --- Dynamic Resizing Logic ---
+        self._sub_resize_job = None
+        self._sub_pending_stage = None
+
+        def _flush_sub_resize():
+            self._sub_resize_job = None
+            if not self._sub_pending_stage or not main_bg.winfo_exists(): return
+            w, h = self._sub_pending_stage
+            self._sub_pending_stage = None
+            
+            # Floor the scale at 1.0 so it never shrinks below the spacious layout on small laptops
+            scale = min(w / 1000.0, h / 650.0)
+            scale = max(1.0, min(scale, 2.5)) 
+
+            self._sub_f_title.configure(size=int(16 * scale))
+            self._sub_f_game.configure(size=int(22 * scale))
+            self._sub_f_time.configure(size=int(56 * scale))
+            self._sub_f_ms.configure(size=int(26 * scale))
+            self._sub_f_input.configure(size=int(14 * scale))
+            self._sub_f_btn.configure(size=int(15 * scale))
+
+            # Reduced from 350 to 280 to force wrapping before hitting edges
+            sub_lbl_game.configure(wraplength=int(280 * scale))
+            
+            btn_w, btn_h, s_btn = int(120 * scale), int(40 * scale), int(40 * scale)
+            btn_submit.configure(width=btn_w, height=btn_h)
+            btn_cancel.configure(width=btn_w, height=btn_h)
+            btn_chk.configure(width=s_btn, height=s_btn)
+            btn_x.configure(width=s_btn, height=s_btn)
+
+        def _on_sub_configure(event):
+            if event.width <= 1 or event.height <= 1: return
+            self._sub_pending_stage = (event.width, event.height)
+            if self._sub_resize_job is None:
+                self._sub_resize_job = self.after(16, _flush_sub_resize)
+
+        main_bg.bind("<Configure>", _on_sub_configure)
+        # -----------------------------
 
         def do_cancel():
             self.transition_to(self.build_main_hub, game)
 
-        def prompt_cancel():
-            self._show_modal_popup("Are You Sure?", main_bg, do_cancel)
-
         def do_submit():
             subj = subject_entry.get().strip()
             notes = notes_text.get("1.0", "end").strip()
-            
-            self.session_service.log_play_session(
-                game_id=game.id,
-                date=today_str,
-                duration_seconds=recorded_seconds,
-                subject=subj,
-                notes=notes
-            )
+            self.session_service.log_play_session(game.id, today_str, recorded_seconds, subj, notes)
             self._scroll_to_bottom_pending = True
             self.transition_to(self.build_main_hub, game)
-
-        def prompt_submit():
-            self._show_modal_popup("Submit?", main_bg, do_submit)
-
-        ctk.CTkButton(center_btns, text="Submit", width=120, height=40, fg_color=TIMER_PLAY_GREEN, hover_color=TIMER_PLAY_GREEN_HOVER, cursor="hand2", font=("Segoe UI", 14, "bold"), command=prompt_submit).pack(side="left", padx=10)
-        ctk.CTkButton(center_btns, text="Cancel", width=120, height=40, fg_color="#737373", hover_color="#525252", cursor="hand2", font=("Segoe UI", 14, "bold"), command=prompt_cancel).pack(side="left", padx=10)
 
         self.update_idletasks()
         self.update()
 
-    def _show_modal_popup(self, text, parent, on_yes):
-        # B12-B14 & B16: Native overlay that blocks all clicks to the form behind it
-        trap = tk.Frame(parent, bg="")
-        trap.place(relx=0.5, rely=0.5, anchor="center", relwidth=1.0, relheight=1.0)
-        trap.bind("<Button-1>", lambda e: "break")
+    # ==========================================
+    #      SESSION EDIT SCREEN (D6-D10)
+    # ==========================================
+    def build_session_edit_screen(self, game, session):
+        self._cancel_hover_overlay()
+        self._active_scroll_canvas = None
+        self._details_sync_fn = None
+        
+        for widget in self.winfo_children():
+            widget.destroy()
 
-        overlay = tk.Frame(trap, bg=BG_MAIN, highlightbackground=FG_DIM, highlightthickness=2)
-        overlay.place(relx=0.5, rely=0.5, anchor="center", width=360, height=180)
+        main_bg = tk.Frame(self, bg=BG_MAIN, highlightthickness=0, bd=0)
+        main_bg.pack(fill="both", expand=True)
 
-        tk.Label(overlay, text=text, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 20)).pack(pady=(35, 25))
+        container = tk.Frame(main_bg, bg=BG_MAIN, highlightthickness=0, bd=0)
+        container.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.90)
+
+        f_title = ctk.CTkFont(family="Segoe UI", size=16)
+        f_game = ctk.CTkFont(family="Segoe UI", size=22, weight="bold")
+        f_input = ctk.CTkFont(family="Segoe UI", size=14)
+        f_btn = ctk.CTkFont(family="Segoe UI", size=15, weight="bold")
+        f_time_input = tkfont.Font(family="Segoe UI", size=34, weight="bold")
+
+        header = tk.Frame(container, bg=BG_MAIN)
+        header.pack(fill="x", pady=(0, 40))
+        header.grid_columnconfigure(0, weight=1)
+        header.grid_columnconfigure(1, weight=0) 
+        header.grid_columnconfigure(2, weight=1)
+
+        tk.Label(header, text="Game:", fg=FG_TEXT, bg=BG_MAIN, font=f_title).grid(row=0, column=0, sticky="s")
+        tk.Label(header, text="Session Time:", fg=FG_TEXT, bg=BG_MAIN, font=f_title).grid(row=0, column=1, sticky="s")
+        tk.Label(header, text="Session Date:", fg=FG_TEXT, bg=BG_MAIN, font=f_title).grid(row=0, column=2, sticky="s")
+
+        tk.Label(header, text=game.title, fg=FG_TEXT, bg=BG_MAIN, font=f_game, wraplength=280, justify="center").grid(row=1, column=0, pady=(15,0))
+
+        # Time Editor Slots (Option 2 Clamp Logic)
+        time_val_frame = tk.Frame(header, bg=BG_MAIN)
+        time_val_frame.grid(row=1, column=1, pady=(15,0))
+
+        total_cs = max(0, int(session.duration_seconds * 100))
+        init_ms = total_cs % 100
+        total_sec = total_cs // 100
+        init_s = total_sec % 60
+        init_m = (total_sec // 60) % 60
+        init_h = total_sec // 3600
+
+        def make_time_entry(parent, init_val, max_val):
+            var = tk.StringVar(value=f"{init_val:02d}")
+            entry = tk.Entry(parent, textvariable=var, width=3, font=f_time_input, bg="#2B2B2B", fg=FG_TEXT, insertbackground=FG_TEXT, highlightbackground=FG_DIM, highlightcolor="#2563EB", relief="flat", bd=4, justify="center")
+            
+            def clamp_input(event=None):
+                val = var.get()
+                clean = ''.join(filter(str.isdigit, val))
+                if not clean:
+                    var.set("00")
+                    return
+                num = int(clean)
+                if num > max_val: num = max_val
+                var.set(f"{num:02d}")
+
+            def on_key(e):
+                val = var.get()
+                clean = ''.join(filter(str.isdigit, val))
+                if val != clean: var.set(clean)
+                if clean and int(clean) > max_val: var.set(str(max_val))
+
+            entry.bind("<FocusOut>", clamp_input)
+            entry.bind("<KeyRelease>", on_key)
+            return var, entry
+
+        var_h, ent_h = make_time_entry(time_val_frame, init_h, 999)
+        var_m, ent_m = make_time_entry(time_val_frame, init_m, 59)
+        var_s, ent_s = make_time_entry(time_val_frame, init_s, 59)
+        var_ms, ent_ms = make_time_entry(time_val_frame, init_ms, 99)
+
+        sep_font = tkfont.Font(family="Segoe UI", size=24, weight="bold")
+        ent_h.pack(side="left")
+        tk.Label(time_val_frame, text=":", fg=FG_TEXT, bg=BG_MAIN, font=sep_font).pack(side="left", padx=4)
+        ent_m.pack(side="left")
+        tk.Label(time_val_frame, text=":", fg=FG_TEXT, bg=BG_MAIN, font=sep_font).pack(side="left", padx=4)
+        ent_s.pack(side="left")
+        tk.Label(time_val_frame, text=".", fg=FG_TEXT, bg=BG_MAIN, font=sep_font).pack(side="left", padx=4, anchor="s")
+        ent_ms.pack(side="left", anchor="s")
+
+        tk.Label(header, text=session.date, fg=FG_TEXT, bg=BG_MAIN, font=f_game).grid(row=1, column=2, pady=(15,0))
+
+        # Edit Inputs
+        subj_frame = tk.Frame(container, bg=BG_MAIN)
+        subj_frame.pack(fill="x", pady=(10, 20))
+        tk.Label(subj_frame, text="Session Subject (optional):", fg=FG_TEXT, bg=BG_MAIN, font=f_input).pack(anchor="w", pady=(0, 5))
+        subject_entry = tk.Entry(subj_frame, font=f_input, bg="#2B2B2B", fg=FG_TEXT, insertbackground=FG_TEXT, highlightbackground=FG_DIM, highlightcolor="#2563EB", relief="flat", bd=4)
+        subject_entry.pack(fill="x", ipady=4)
+        subject_entry.insert(0, session.subject)
+
+        notes_frame = tk.Frame(container, bg=BG_MAIN)
+        notes_frame.pack(fill="x", pady=(0, 30))
+        tk.Label(notes_frame, text="Session Notes (optional):", fg=FG_TEXT, bg=BG_MAIN, font=f_input).pack(anchor="w", pady=(0, 5))
+        notes_text = tk.Text(notes_frame, height=9, font=f_input, bg="#2B2B2B", fg=FG_TEXT, insertbackground=FG_TEXT, highlightbackground=FG_DIM, highlightcolor="#2563EB", relief="flat", bd=4, wrap="word")
+        notes_text.pack(fill="x")
+        notes_text.insert("1.0", session.notes)
+
+        # Buttons
+        btn_row = tk.Frame(container, bg=BG_MAIN)
+        btn_row.pack(fill="x", pady=(10, 0))
+        btn_row.grid_columnconfigure(0, weight=1, uniform="btn_half")
+        btn_row.grid_columnconfigure(1, weight=1, uniform="btn_half")
+
+        left_side = tk.Frame(btn_row, bg=BG_MAIN)
+        left_side.grid(row=0, column=0, sticky="e", padx=(0, 5))
+        
+        ctk.CTkButton(left_side, text="✓", width=40, height=40, fg_color="transparent", border_width=2, cursor="hand2").pack(side="left", padx=(0, 8))
+        ctk.CTkButton(left_side, text="X", width=40, height=40, fg_color="transparent", border_width=2, cursor="hand2").pack(side="left", padx=(0, 16))
+
+        def do_cancel():
+            self.transition_to(self.build_main_hub, game)
+
+        def do_save():
+            self.focus_set() # Force Entry clamps to finalize
+            h, m = int(var_h.get() or "0"), int(var_m.get() or "0")
+            s, ms = int(var_s.get() or "0"), int(var_ms.get() or "0")
+            new_dur = (h * 3600) + (m * 60) + s + (ms / 100.0)
+            
+            session.duration_seconds = new_dur
+            session.duration_hours = new_dur / 3600.0
+            session.subject = subject_entry.get().strip()
+            session.notes = notes_text.get("1.0", "end").strip()
+            
+            self.session_service.edit_play_session(session)
+            self.transition_to(self.build_main_hub, game)
+
+        def prompt_save():
+            self._show_modal_popup("Save Changes?", None, do_save)
+
+        ctk.CTkButton(left_side, text="Save", width=120, height=40, fg_color=TIMER_PLAY_GREEN, hover_color=TIMER_PLAY_GREEN_HOVER, cursor="hand2", font=f_btn, command=prompt_save).pack(side="left")
+
+        right_side = tk.Frame(btn_row, bg=BG_MAIN)
+        right_side.grid(row=0, column=1, sticky="w", padx=(5, 0))
+
+        # Cancel skips modal (D7)
+        ctk.CTkButton(right_side, text="Cancel", width=120, height=40, fg_color="#737373", hover_color="#525252", cursor="hand2", font=f_btn, command=do_cancel).pack(side="left")
+
+    def _show_modal_popup(self, text, subtext, on_yes):
+        # Anchor overlay directly to 'self' (root window) to guarantee dead-center placement
+        overlay = tk.Frame(self, bg=BG_MAIN, highlightbackground=FG_DIM, highlightthickness=2)
+        overlay.place(relx=0.5, rely=0.5, anchor="center", width=420, height=200)
+        
+        # Natively routes all events to this popup, perfectly blocking clicks behind it
+        overlay.grab_set()
+
+        tk.Label(overlay, text=text, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 20)).pack(pady=(25, 5))
+        
+        if subtext:
+            # ADDED: wraplength=380 and justify="center" prevents any visual text cutoffs
+            tk.Label(overlay, text=subtext, fg=FG_DIM, bg=BG_MAIN, font=("Segoe UI", 10), wraplength=380, justify="center").pack(pady=(0, 20))
+        else:
+            tk.Frame(overlay, bg=BG_MAIN, height=20).pack(pady=(0, 20)) # spacer
 
         btn_row = tk.Frame(overlay, bg=BG_MAIN)
         btn_row.pack()
         
         def yes_click():
-            trap.destroy()
+            overlay.grab_release()
+            overlay.destroy()
             on_yes()
             
         def no_click():
-            trap.destroy()
+            overlay.grab_release()
+            overlay.destroy()
 
         ctk.CTkButton(btn_row, text="Yes", width=80, height=36, fg_color=TIMER_PLAY_GREEN, hover_color=TIMER_PLAY_GREEN_HOVER, cursor="hand2", command=yes_click).pack(side="left", padx=10)
         ctk.CTkButton(btn_row, text="No", width=80, height=36, fg_color=TIMER_STOP_RED, hover_color=TIMER_STOP_RED_HOVER, cursor="hand2", command=no_click).pack(side="left", padx=10)

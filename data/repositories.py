@@ -205,3 +205,25 @@ class SqliteSessionRepository(SessionRepository):
                     duration_seconds=row[6]
                 ))
             return sessions
+
+    def delete_sessions_for_game(self, game_id: int) -> None:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM play_sessions WHERE game_id = ?", (game_id,))
+            conn.commit()
+
+    def update_session(self, session: PlaySession) -> None:
+        query = """
+            UPDATE play_sessions 
+            SET duration_hours = ?, subject = ?, notes = ?, duration_seconds = ?
+            WHERE id = ?
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(query, (session.duration_hours, session.subject, session.notes, session.duration_seconds, session.id))
+            conn.commit()
+
+    def delete_session(self, session_id: int) -> None:
+        query = "DELETE FROM play_sessions WHERE id = ?"
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(query, (session_id,))
+            conn.commit()
