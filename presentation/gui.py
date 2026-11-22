@@ -70,6 +70,7 @@ def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
     h = hex_color.lstrip("#")
     return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
 
+
 class ToolTip:
     def __init__(self, widget, text):
         self.widget = widget
@@ -98,14 +99,23 @@ class ToolTip:
 
     def showtip(self, event=None):
         x = y = 0
-        x, y, cx, cy = self.widget.bbox("insert")
+        x, y, _cx, _cy = self.widget.bbox("insert")
         x += self.widget.winfo_rootx() + 20
         y += self.widget.winfo_rooty() + 20
         self.tipwindow = tw = tk.Toplevel(self.widget)
         tw.wm_overrideredirect(True)
         tw.wm_geometry(f"+{x}+{y}")
-        
-        label = tk.Label(tw, text=self.text, justify="left", background="#1E1E1E", fg="#DCE4EE", relief="solid", borderwidth=1, font=("Segoe UI", 9))
+
+        label = tk.Label(
+            tw,
+            text=self.text,
+            justify="left",
+            background="#1E1E1E",
+            fg="#DCE4EE",
+            relief="solid",
+            borderwidth=1,
+            font=("Segoe UI", 9),
+        )
         label.pack(ipadx=4, ipady=2)
 
     def hidetip(self):
@@ -113,13 +123,16 @@ class ToolTip:
             self.tipwindow.destroy()
             self.tipwindow = None
 
+
 class GameLedgerApp(ctk.CTk):
     SETTINGS_PATH = Path("data/ui_settings.json")
     MIN_SIDEBAR_WIDTH = 185
     MIN_MAIN_WIDTH = 560
     SASH_WIDTH = 6
 
-    def __init__(self, catalog_service: CatalogService, session_service: SessionService):
+    def __init__(
+        self, catalog_service: CatalogService, session_service: SessionService
+    ):
         super().__init__()
         self.service = catalog_service
         self.session_service = session_service
@@ -161,7 +174,7 @@ class GameLedgerApp(ctk.CTk):
         self._timer_resize_job = None
         self._timer_hq_job = None
         self._timer_pending_stage: tuple[int, int] | None = None
-        self._timer_masters: dict[str, "Image.Image"] = {}
+        self._timer_masters: dict[str, Image.Image] = {}
         self._timer_photos: dict[str, tk.PhotoImage] = {}
         self._timer_rendered_sizes: dict[str, int] = {}
         self._timer_hovered_btn: str | None = None
@@ -181,8 +194,8 @@ class GameLedgerApp(ctk.CTk):
                         new_data.append(item)
                 img.putdata(new_data)
                 self._edit_icon_img = ctk.CTkImage(light_image=img, size=(16, 16))
-            except Exception:
-                pass
+            except OSError:
+                self._edit_icon_img = None
 
         # Fetch actual database on startup
         self.backlog_games = self.service.get_backlog()
@@ -204,11 +217,11 @@ class GameLedgerApp(ctk.CTk):
         }
 
         self.platform_colors = {
-            "PlayStation 4": "#2563EB",      # Blue
+            "PlayStation 4": "#2563EB",  # Blue
             "PlayStation 5": "white",
-            "Xbox Series X": "#007A33",      # Green
-            "PC": "#87CEEB",                 # Sky-Blue
-            "Nintendo Switch": "#E60012",    # True Red
+            "Xbox Series X": "#007A33",  # Green
+            "PC": "#87CEEB",  # Sky-Blue
+            "Nintendo Switch": "#E60012",  # True Red
             "Nintendo Switch 2": "#D2042D",  # Cherry Red
         }
 
@@ -438,9 +451,7 @@ class GameLedgerApp(ctk.CTk):
             self._cancel_hover_overlay()
             return
 
-        _, is_trunc = self._truncate_text(
-            game.title, max(50, self.sidebar_width - 78)
-        )
+        _, is_trunc = self._truncate_text(game.title, max(50, self.sidebar_width - 78))
         if not is_trunc:
             return
 
@@ -825,9 +836,9 @@ class GameLedgerApp(ctk.CTk):
         search_frame.grid_columnconfigure(0, weight=1)
         search_frame.grid_columnconfigure(1, weight=0)
 
-        ctk.CTkEntry(
-            search_frame, placeholder_text="Search local...", width=10
-        ).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        ctk.CTkEntry(search_frame, placeholder_text="Search local...", width=10).grid(
+            row=0, column=0, sticky="ew", padx=(0, 6)
+        )
         ctk.CTkButton(search_frame, text="≡", width=30, cursor="hand2").grid(
             row=0, column=1, sticky="e"
         )
@@ -917,9 +928,7 @@ class GameLedgerApp(ctk.CTk):
                         (title_lbl, game.title, display_title)
                     )
 
-                    def on_enter(
-                        e, frame=item_frame, selected=is_selected, g=game
-                    ):
+                    def on_enter(e, frame=item_frame, selected=is_selected, g=game):
                         if not selected:
                             self._set_row_bg(frame, BG_HOVER)
                         if self._hover_game_id != g.id:
@@ -937,9 +946,8 @@ class GameLedgerApp(ctk.CTk):
                         def _check():
                             if self._is_pointer_inside(frame):
                                 return
-                            if (
-                                self._hover_game_id == gid
-                                and self._is_pointer_inside(self._hover_overlay)
+                            if self._hover_game_id == gid and self._is_pointer_inside(
+                                self._hover_overlay
                             ):
                                 return
                             if not selected and frame.winfo_exists():
@@ -994,9 +1002,7 @@ class GameLedgerApp(ctk.CTk):
         v_scroll.grid(row=0, column=1, sticky="ns", padx=(4, 0))
         details_canvas.configure(yscrollcommand=v_scroll.set)
 
-        details_inner = tk.Frame(
-            details_canvas, bg=BG_MAIN, highlightthickness=0, bd=0
-        )
+        details_inner = tk.Frame(details_canvas, bg=BG_MAIN, highlightthickness=0, bd=0)
         inner_window_id = details_canvas.create_window(
             (0, 0), window=details_inner, anchor="nw"
         )
@@ -1007,7 +1013,9 @@ class GameLedgerApp(ctk.CTk):
         publisher = details.get("publisher", "Unknown Publisher")
         genre = details.get("genre", "Unknown Genre")
         general_release = details.get("general_release", "N/A")
-        desc = details.get("description", "No description available for this title yet.")
+        desc = details.get(
+            "description", "No description available for this title yet."
+        )
 
         # Fetch sessions early to evaluate if the Wipe button should be disabled
         sessions = self.session_service.get_sessions_for_game(game.id)
@@ -1109,7 +1117,9 @@ class GameLedgerApp(ctk.CTk):
         dots_btn.pack(side="left", padx=2)
 
         # The Custom Menu Container
-        self.dots_menu = tk.Frame(details_inner, bg=BG_HOVER, highlightbackground=FG_DIM, highlightthickness=1)
+        self.dots_menu = tk.Frame(
+            details_inner, bg=BG_HOVER, highlightbackground=FG_DIM, highlightthickness=1
+        )
 
         def toggle_dots_menu():
             if self.dots_menu.winfo_ismapped():
@@ -1118,7 +1128,12 @@ class GameLedgerApp(ctk.CTk):
                 self.update_idletasks()
                 scale = dots_btn._get_widget_scaling()
                 x = (btn_row.winfo_rootx() - details_inner.winfo_rootx()) / scale
-                y = (btn_row.winfo_rooty() - details_inner.winfo_rooty() + btn_row.winfo_height() + 6) / scale
+                y = (
+                    btn_row.winfo_rooty()
+                    - details_inner.winfo_rooty()
+                    + btn_row.winfo_height()
+                    + 6
+                ) / scale
                 self.dots_menu.place(x=x, y=y)
                 self.dots_menu.lift()
 
@@ -1136,9 +1151,9 @@ class GameLedgerApp(ctk.CTk):
         def prompt_wipe():
             self.dots_menu.place_forget()
             self._show_modal_popup(
-                "Are you Sure?", 
-                "(This will permanently delete your data for this game.)", 
-                do_wipe
+                "Are you Sure?",
+                "(This will permanently delete your data for this game.)",
+                do_wipe,
             )
 
         # --- Archival Remove Action ---
@@ -1153,9 +1168,9 @@ class GameLedgerApp(ctk.CTk):
                 do_remove()
             else:
                 self._show_modal_popup(
-                    "Are you Sure?", 
-                    "(This will remove the game from your library, but your data will be saved.)", 
-                    do_remove
+                    "Are you Sure?",
+                    "(This will remove the game from your library, but your data will be saved.)",
+                    do_remove,
                 )
 
         # Build the menu items
@@ -1163,10 +1178,31 @@ class GameLedgerApp(ctk.CTk):
         wipe_color = FG_TEXT if has_sessions else FG_DIM
 
         # WIDENED buttons to 245 to perfectly match the width of the 4 above buttons
-        btn_remove_menu = ctk.CTkButton(self.dots_menu, text="Remove", fg_color="transparent", text_color=FG_TEXT, hover_color=BG_SELECTED, corner_radius=0, width=245, anchor="w", command=prompt_remove)
+        btn_remove_menu = ctk.CTkButton(
+            self.dots_menu,
+            text="Remove",
+            fg_color="transparent",
+            text_color=FG_TEXT,
+            hover_color=BG_SELECTED,
+            corner_radius=0,
+            width=245,
+            anchor="w",
+            command=prompt_remove,
+        )
         btn_remove_menu.pack(fill="x", pady=(2, 1), padx=2)
 
-        btn_wipe_menu = ctk.CTkButton(self.dots_menu, text="Permanently Wipe Data", fg_color="transparent", text_color=wipe_color, hover_color=BG_SELECTED, corner_radius=0, width=245, anchor="w", state=wipe_state, command=prompt_wipe)
+        btn_wipe_menu = ctk.CTkButton(
+            self.dots_menu,
+            text="Permanently Wipe Data",
+            fg_color="transparent",
+            text_color=wipe_color,
+            hover_color=BG_SELECTED,
+            corner_radius=0,
+            width=245,
+            anchor="w",
+            state=wipe_state,
+            command=prompt_wipe,
+        )
         btn_wipe_menu.pack(fill="x", pady=(1, 2), padx=2)
 
         # ---------------------------------------------
@@ -1240,7 +1276,7 @@ class GameLedgerApp(ctk.CTk):
             anchor="w",
         ).pack(fill="x", pady=(0, 8))
 
-        # By wrapping row generation in a function, Python is forced to isolate 
+        # By wrapping row generation in a function, Python is forced to isolate
         # the variables so no rows ever overwrite or glitch each other.
         def build_session_row(session_obj):
             has_subj = bool(session_obj.subject.strip())
@@ -1250,26 +1286,58 @@ class GameLedgerApp(ctk.CTk):
             row_container = tk.Frame(progress_section, bg=BG_MAIN)
             row_container.pack(fill="x", pady=2)
 
-            main_row = ctk.CTkFrame(row_container, fg_color=BG_MAIN, corner_radius=8, cursor="hand2" if is_clickable else "")
+            main_row = ctk.CTkFrame(
+                row_container,
+                fg_color=BG_MAIN,
+                corner_radius=8,
+                cursor="hand2" if is_clickable else "",
+            )
             main_row.pack(fill="x", ipady=8, padx=4)
 
             left_f = tk.Frame(main_row, bg=BG_MAIN)
             left_f.pack(side="left", padx=(10, 0))
-            
-            tk.Label(left_f, text="●", fg="#2563EB", bg=BG_MAIN, font=self._sidebar_dot_font).pack(side="left", padx=(0, 6))
-            tk.Label(left_f, text=session_obj.date, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 11)).pack(side="left")
+
+            tk.Label(
+                left_f, text="●", fg="#2563EB", bg=BG_MAIN, font=self._sidebar_dot_font
+            ).pack(side="left", padx=(0, 6))
+            tk.Label(
+                left_f,
+                text=session_obj.date,
+                fg=FG_TEXT,
+                bg=BG_MAIN,
+                font=("Segoe UI", 11),
+            ).pack(side="left")
 
             arrow_lbl = None
             if is_clickable:
-                arrow_lbl = tk.Label(left_f, text=">", fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 10, "bold"))
+                arrow_lbl = tk.Label(
+                    left_f,
+                    text=">",
+                    fg=FG_TEXT,
+                    bg=BG_MAIN,
+                    font=("Segoe UI", 10, "bold"),
+                )
                 arrow_lbl.pack(side="left", padx=(8, 0))
 
             right_f = tk.Frame(main_row, bg=BG_MAIN)
             right_f.pack(side="right", padx=(0, 10))
 
             actions_f = tk.Frame(right_f, bg=BG_MAIN)
-            
-            edit_btn = ctk.CTkButton(actions_f, image=self._edit_icon_img, text="" if self._edit_icon_img else "✎", width=28, height=28, fg_color="transparent", hover_color=BG_SELECTED, text_color=FG_TEXT, cursor="hand2", command=lambda: self.transition_to(self.build_session_edit_screen, game, session_obj))
+
+            edit_btn = ctk.CTkButton(
+                actions_f,
+                image=self._edit_icon_img,
+                text="" if self._edit_icon_img else "✎",
+                width=28,
+                height=28,
+                fg_color="transparent",
+                hover_color=BG_SELECTED,
+                text_color=FG_TEXT,
+                cursor="hand2",
+                command=lambda: self.transition_to(
+                    self.build_session_edit_screen, game, session_obj
+                ),
+            )
             edit_btn.pack(side="left", padx=(0, 4))
             ToolTip(edit_btn, "Edit")
 
@@ -1281,39 +1349,85 @@ class GameLedgerApp(ctk.CTk):
                     self.render_sidebar()
                 self.render_inline_game_details(game)
 
-            delete_btn = ctk.CTkButton(actions_f, text="X", width=28, height=28, fg_color="transparent", hover_color=TIMER_STOP_RED_HOVER, text_color=TIMER_STOP_RED, cursor="hand2", command=on_delete_session)
+            delete_btn = ctk.CTkButton(
+                actions_f,
+                text="X",
+                width=28,
+                height=28,
+                fg_color="transparent",
+                hover_color=TIMER_STOP_RED_HOVER,
+                text_color=TIMER_STOP_RED,
+                cursor="hand2",
+                command=on_delete_session,
+            )
             delete_btn.pack(side="left", padx=(0, 8))
             ToolTip(delete_btn, "Delete")
 
             s_main, s_ms = self._format_stopwatch(session_obj.duration_seconds)
-            time_lbl_ms = tk.Label(right_f, text=s_ms, fg=FG_MUTED, bg=BG_MAIN, font=("Segoe UI", 9))
+            time_lbl_ms = tk.Label(
+                right_f, text=s_ms, fg=FG_MUTED, bg=BG_MAIN, font=("Segoe UI", 9)
+            )
             time_lbl_ms.pack(side="right", anchor="s", pady=(0, 1))
-            time_lbl_main = tk.Label(right_f, text=s_main, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 11))
+            time_lbl_main = tk.Label(
+                right_f, text=s_main, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 11)
+            )
             time_lbl_main.pack(side="right", anchor="s")
 
             details_f = tk.Frame(row_container, bg=BG_MAIN)
             if has_subj:
-                tk.Label(details_f, text="Subject", fg=FG_DIM, bg=BG_MAIN, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=(22, 0), pady=(4, 0))
-                s_lbl = tk.Label(details_f, text=session_obj.subject, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 10), justify="left", wraplength=400)
+                tk.Label(
+                    details_f,
+                    text="Subject",
+                    fg=FG_DIM,
+                    bg=BG_MAIN,
+                    font=("Segoe UI", 9, "bold"),
+                ).pack(anchor="w", padx=(22, 0), pady=(4, 0))
+                s_lbl = tk.Label(
+                    details_f,
+                    text=session_obj.subject,
+                    fg=FG_TEXT,
+                    bg=BG_MAIN,
+                    font=("Segoe UI", 10),
+                    justify="left",
+                    wraplength=400,
+                )
                 s_lbl.pack(anchor="w", padx=(22, 0), pady=(0, 6))
                 self._accordion_labels.append(s_lbl)
             if has_notes:
-                tk.Label(details_f, text="Notes", fg=FG_DIM, bg=BG_MAIN, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=(22, 0), pady=(4, 0))
-                n_lbl = tk.Label(details_f, text=session_obj.notes, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 10), justify="left", wraplength=400)
+                tk.Label(
+                    details_f,
+                    text="Notes",
+                    fg=FG_DIM,
+                    bg=BG_MAIN,
+                    font=("Segoe UI", 9, "bold"),
+                ).pack(anchor="w", padx=(22, 0), pady=(4, 0))
+                n_lbl = tk.Label(
+                    details_f,
+                    text=session_obj.notes,
+                    fg=FG_TEXT,
+                    bg=BG_MAIN,
+                    font=("Segoe UI", 10),
+                    justify="left",
+                    wraplength=400,
+                )
                 n_lbl.pack(anchor="w", padx=(22, 0), pady=(0, 6))
                 self._accordion_labels.append(n_lbl)
 
             # Restored the transparent separator line with perfect spacing
-            tk.Frame(progress_section, height=1, bg=BG_DIVIDER).pack(fill="x", pady=(4, 8))
+            tk.Frame(progress_section, height=1, bg=BG_DIVIDER).pack(
+                fill="x", pady=(4, 8)
+            )
 
             state = {"expanded": False}
-            
+
             # Helper to uniformly apply background color to the row and its inner labels
             def set_bg(color):
                 main_row.configure(fg_color=color)
                 left_f.configure(bg=color)
                 right_f.configure(bg=color)
-                actions_f.configure(bg=color) # FIXED: Removes the black box around the buttons
+                actions_f.configure(
+                    bg=color
+                )  # FIXED: Removes the black box around the buttons
                 for w in left_f.winfo_children() + right_f.winfo_children():
                     if w is not actions_f and not isinstance(w, ctk.CTkButton):
                         w.configure(bg=color)
@@ -1321,15 +1435,16 @@ class GameLedgerApp(ctk.CTk):
             def on_enter(e):
                 set_bg(BG_HOVER)
                 actions_f.pack(side="left", before=time_lbl_main)
-                
+
             def on_leave(e):
                 # FIXED: Uses a micro-delay to check pointer coordinates so rapid sweeping doesn't glitch
                 def check_leave():
-                    if not main_row.winfo_exists(): return
-                    if not self._is_pointer_inside(main_row):
-                        if not state["expanded"]:
-                            set_bg(BG_MAIN)
-                            actions_f.pack_forget()
+                    if not main_row.winfo_exists():
+                        return
+                    if not self._is_pointer_inside(main_row) and not state["expanded"]:
+                        set_bg(BG_MAIN)
+                        actions_f.pack_forget()
+
                 self.after(20, check_leave)
 
             # Deep bind hover events to everything inside the row
@@ -1339,15 +1454,18 @@ class GameLedgerApp(ctk.CTk):
                 for c in widget.winfo_children():
                     if not isinstance(c, ctk.CTkButton):
                         bind_hover(c)
-            
+
             bind_hover(main_row)
-            
+
             if is_clickable:
+
                 def toggle(e):
                     # Prevent toggle if clicking on action buttons
-                    if self._is_pointer_inside(edit_btn) or self._is_pointer_inside(delete_btn):
+                    if self._is_pointer_inside(edit_btn) or self._is_pointer_inside(
+                        delete_btn
+                    ):
                         return
-                    
+
                     state["expanded"] = not state["expanded"]
                     if state["expanded"]:
                         details_f.pack(fill="x", pady=(0, 6))
@@ -1360,19 +1478,25 @@ class GameLedgerApp(ctk.CTk):
                         if not self._is_pointer_inside(main_row):
                             set_bg(BG_MAIN)
                             actions_f.pack_forget()
-                    
+
                     if details_canvas.winfo_exists():
-                        details_canvas.configure(scrollregion=details_canvas.bbox("all"))
-                
+                        details_canvas.configure(
+                            scrollregion=details_canvas.bbox("all")
+                        )
+
                 # Bind click recursively to all non-button elements inside main_row
                 def bind_click(w):
                     # Skip action buttons entirely so they click freely
-                    if w is actions_f or w.master is actions_f or isinstance(w, ctk.CTkButton):
+                    if (
+                        w is actions_f
+                        or w.master is actions_f
+                        or isinstance(w, ctk.CTkButton)
+                    ):
                         return
                     w.bind("<Button-1>", toggle)
                     for child in w.winfo_children():
                         bind_click(child)
-                        
+
                 bind_click(main_row)
 
         # Execute the function for every session to guarantee isolated scope
@@ -1454,7 +1578,9 @@ class GameLedgerApp(ctk.CTk):
         # 2. Master orbiting dot (64x64 RGBA — overlaps the ring line cleanly)
         dot_m = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
         dd = ImageDraw.Draw(dot_m)
-        dd.ellipse((4, 4, 60, 60), fill=(255, 255, 255, 255), outline=(*bg, 255), width=4)
+        dd.ellipse(
+            (4, 4, 60, 60), fill=(255, 255, 255, 255), outline=(*bg, 255), width=4
+        )
         self._timer_masters["dot"] = dot_m
 
         # 3. Master Play / Pause buttons (256x256 RGB)
@@ -1483,7 +1609,9 @@ class GameLedgerApp(ctk.CTk):
             img = Image.new("RGB", (256, 256), bg)
             d = ImageDraw.Draw(img)
             d.ellipse((8, 8, 248, 248), fill=_hex_to_rgb(fill_hex))
-            d.rounded_rectangle((92, 92, 164, 164), radius=6, fill=_hex_to_rgb(icon_hex))
+            d.rounded_rectangle(
+                (92, 92, 164, 164), radius=6, fill=_hex_to_rgb(icon_hex)
+            )
             return img
 
         self._timer_masters["stop_normal"] = _make_stop(TIMER_STOP_RED, "#FFFFFF")
@@ -1528,14 +1656,16 @@ class GameLedgerApp(ctk.CTk):
             BG_MAIN, TIMER_RESTART_DISABLED
         )
 
-    def _build_crisp_ring_photo(self, ring_img_size: int, ring_r: float) -> tk.PhotoImage:
+    def _build_crisp_ring_photo(
+        self, ring_img_size: int, ring_r: float
+    ) -> tk.PhotoImage:
         """Renders a 3x-supersampled ring with exact constant-crispness stroke at resting size."""
         ss = 3
         bg = _hex_to_rgb(BG_MAIN)
         s_img = ring_img_size * ss
         img = Image.new("RGB", (s_img, s_img), bg)
         d = ImageDraw.Draw(img)
-        stroke_ss = max(5, int(round(2.0 * ss)))
+        stroke_ss = max(5, round(2.0 * ss))
         c = s_img / 2.0
         # Draw outward by half stroke so the stroke centerline lands at exact radius ring_r
         r_outer = ring_r * ss + stroke_ss / 2.0
@@ -1780,10 +1910,10 @@ class GameLedgerApp(ctk.CTk):
         scale = max(0.65, min(scale, 2.5))
 
         ring_r = max(90.0, round(148.0 * scale))
-        ring_img_size = int(round(ring_r * 2.0 * (720.0 / 672.0)))
-        dot_d = max(10, int(round(13.0 * scale)))
-        play_d = max(56, int(round(86.0 * scale)))
-        side_d = max(44, int(round(64.0 * scale)))
+        ring_img_size = round(ring_r * 2.0 * (720.0 / 672.0))
+        dot_d = max(10, round(13.0 * scale))
+        play_d = max(56, round(86.0 * scale))
+        side_d = max(44, round(64.0 * scale))
         btn_gap_y = round(34.0 * scale)
         btn_spacing_x = round(152.0 * scale)
 
@@ -1807,9 +1937,9 @@ class GameLedgerApp(ctk.CTk):
         }
 
         # Scale fonts smoothly with the ring
-        ready_sz = max(14, int(round(24 * scale)))
-        main_sz = max(18, int(round(32 * scale)))
-        ms_sz = max(10, int(round(15 * scale)))
+        ready_sz = max(14, round(24 * scale))
+        main_sz = max(18, round(32 * scale))
+        ms_sz = max(10, round(15 * scale))
         if self._ready_font.cget("size") != ready_sz:
             self._ready_font.configure(size=ready_sz)
         if self._time_main_font.cget("size") != main_sz:
@@ -1938,9 +2068,7 @@ class GameLedgerApp(ctk.CTk):
                 )
             else:
                 p_key = (
-                    "play_hover"
-                    if self._timer_hovered_btn == "play"
-                    else "play_normal"
+                    "play_hover" if self._timer_hovered_btn == "play" else "play_normal"
                 )
             c.itemconfigure(self._play_item_id, image=self._timer_photos[p_key])
 
@@ -1965,14 +2093,27 @@ class GameLedgerApp(ctk.CTk):
                 else BG_MAIN
             )
             c.create_oval(
-                rx - rr, ry - rr, rx + rr, ry + rr,
-                fill=r_bg, outline=r_stroke, width=2, tags="fallback_btn",
+                rx - rr,
+                ry - rr,
+                rx + rr,
+                ry + rr,
+                fill=r_bg,
+                outline=r_stroke,
+                width=2,
+                tags="fallback_btn",
             )
             ar = rr * 0.4
             c.create_arc(
-                rx - ar, ry - ar, rx + ar, ry + ar,
-                start=18, extent=-288, style="arc",
-                outline=r_stroke, width=2.5, tags="fallback_btn",
+                rx - ar,
+                ry - ar,
+                rx + ar,
+                ry + ar,
+                start=18,
+                extent=-288,
+                style="arc",
+                outline=r_stroke,
+                width=2.5,
+                tags="fallback_btn",
             )
 
             px, py, pr = self._timer_btn_geom["play"]
@@ -1983,17 +2124,32 @@ class GameLedgerApp(ctk.CTk):
                     else TIMER_PAUSE_ORANGE
                 )
                 c.create_oval(
-                    px - pr, py - pr, px + pr, py + pr,
-                    fill=p_bg, outline="", tags="fallback_btn",
+                    px - pr,
+                    py - pr,
+                    px + pr,
+                    py + pr,
+                    fill=p_bg,
+                    outline="",
+                    tags="fallback_btn",
                 )
                 bw, bh, bgap = pr * 0.22, pr * 0.38, pr * 0.14
                 c.create_rectangle(
-                    px - bgap - bw, py - bh, px - bgap, py + bh,
-                    fill="#FFFFFF", outline="", tags="fallback_btn",
+                    px - bgap - bw,
+                    py - bh,
+                    px - bgap,
+                    py + bh,
+                    fill="#FFFFFF",
+                    outline="",
+                    tags="fallback_btn",
                 )
                 c.create_rectangle(
-                    px + bgap, py - bh, px + bgap + bw, py + bh,
-                    fill="#FFFFFF", outline="", tags="fallback_btn",
+                    px + bgap,
+                    py - bh,
+                    px + bgap + bw,
+                    py + bh,
+                    fill="#FFFFFF",
+                    outline="",
+                    tags="fallback_btn",
                 )
             else:
                 p_bg = (
@@ -2002,14 +2158,24 @@ class GameLedgerApp(ctk.CTk):
                     else TIMER_PLAY_GREEN
                 )
                 c.create_oval(
-                    px - pr, py - pr, px + pr, py + pr,
-                    fill=p_bg, outline="", tags="fallback_btn",
+                    px - pr,
+                    py - pr,
+                    px + pr,
+                    py + pr,
+                    fill=p_bg,
+                    outline="",
+                    tags="fallback_btn",
                 )
                 c.create_polygon(
-                    px - pr * 0.22, py - pr * 0.4,
-                    px - pr * 0.22, py + pr * 0.4,
-                    px + pr * 0.42, py,
-                    fill="#FFFFFF", outline="", tags="fallback_btn",
+                    px - pr * 0.22,
+                    py - pr * 0.4,
+                    px - pr * 0.22,
+                    py + pr * 0.4,
+                    px + pr * 0.42,
+                    py,
+                    fill="#FFFFFF",
+                    outline="",
+                    tags="fallback_btn",
                 )
 
             sx, sy, sr = self._timer_btn_geom["stop"]
@@ -2024,13 +2190,23 @@ class GameLedgerApp(ctk.CTk):
                 s_bg = TIMER_STOP_DISABLED_BG
                 s_icon = TIMER_STOP_DISABLED_ICON
             c.create_oval(
-                sx - sr, sy - sr, sx + sr, sy + sr,
-                fill=s_bg, outline="", tags="fallback_btn",
+                sx - sr,
+                sy - sr,
+                sx + sr,
+                sy + sr,
+                fill=s_bg,
+                outline="",
+                tags="fallback_btn",
             )
             sq = sr * 0.32
             c.create_rectangle(
-                sx - sq, sy - sq, sx + sq, sy + sq,
-                fill=s_icon, outline="", tags="fallback_btn",
+                sx - sq,
+                sy - sq,
+                sx + sq,
+                sy + sq,
+                fill=s_icon,
+                outline="",
+                tags="fallback_btn",
             )
 
         # Keep cursor synchronized if a button just disabled under the pointer
@@ -2137,7 +2313,7 @@ class GameLedgerApp(ctk.CTk):
         self._cancel_timer_resize_jobs()
         self._active_scroll_canvas = None
         self._details_sync_fn = None
-        
+
         for widget in self.winfo_children():
             widget.destroy()
 
@@ -2163,38 +2339,92 @@ class GameLedgerApp(ctk.CTk):
         header.grid_columnconfigure((0, 1, 2), weight=1, uniform="col")
 
         # ROW 0: TITLES (sticky="s" forces them to sit perfectly on a single horizontal baseline)
-        tk.Label(header, text="Game:", fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_title).grid(row=0, column=0, sticky="s")
-        tk.Label(header, text="Session Time:", fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_title).grid(row=0, column=1, sticky="s")
-        tk.Label(header, text="Session Date:", fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_title).grid(row=0, column=2, sticky="s")
+        tk.Label(
+            header, text="Game:", fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_title
+        ).grid(row=0, column=0, sticky="s")
+        tk.Label(
+            header, text="Session Time:", fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_title
+        ).grid(row=0, column=1, sticky="s")
+        tk.Label(
+            header, text="Session Date:", fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_title
+        ).grid(row=0, column=2, sticky="s")
 
         # ROW 1: VALUES (Removed sticky="n" so they vertically center with the giant Time font)
-        sub_lbl_game = tk.Label(header, text=game.title, fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_game, wraplength=280, justify="center")
-        sub_lbl_game.grid(row=1, column=0, pady=(15,0))
+        sub_lbl_game = tk.Label(
+            header,
+            text=game.title,
+            fg=FG_TEXT,
+            bg=BG_MAIN,
+            font=self._sub_f_game,
+            wraplength=280,
+            justify="center",
+        )
+        sub_lbl_game.grid(row=1, column=0, pady=(15, 0))
 
         main_str, ms_str = self._format_stopwatch(recorded_seconds)
         time_val_frame = tk.Frame(header, bg=BG_MAIN)
-        time_val_frame.grid(row=1, column=1, pady=(15,0))
-        sub_lbl_time = tk.Label(time_val_frame, text=main_str, fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_time)
+        time_val_frame.grid(row=1, column=1, pady=(15, 0))
+        sub_lbl_time = tk.Label(
+            time_val_frame, text=main_str, fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_time
+        )
         sub_lbl_time.pack(side="left", anchor="s")
-        sub_lbl_ms = tk.Label(time_val_frame, text=ms_str, fg=FG_MUTED, bg=BG_MAIN, font=self._sub_f_ms)
+        sub_lbl_ms = tk.Label(
+            time_val_frame, text=ms_str, fg=FG_MUTED, bg=BG_MAIN, font=self._sub_f_ms
+        )
         sub_lbl_ms.pack(side="left", anchor="s", pady=(0, 8))
 
         today_str = datetime.now().strftime("%B %d, %Y")
-        sub_lbl_date = tk.Label(header, text=today_str, fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_game)
-        sub_lbl_date.grid(row=1, column=2, pady=(15,0))
+        sub_lbl_date = tk.Label(
+            header, text=today_str, fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_game
+        )
+        sub_lbl_date.grid(row=1, column=2, pady=(15, 0))
 
         # FORM INPUTS (Dynamically stretch to exactly match the container's 90% width)
         subj_frame = tk.Frame(container, bg=BG_MAIN)
         subj_frame.pack(fill="x", pady=(10, 20))
-        tk.Label(subj_frame, text="Session Subject (optional):", fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_input).pack(anchor="w", pady=(0, 5))
-        subject_entry = tk.Entry(subj_frame, font=self._sub_f_input, bg="#2B2B2B", fg=FG_TEXT, insertbackground=FG_TEXT, highlightbackground=FG_DIM, highlightcolor="#2563EB", relief="flat", bd=4)
+        tk.Label(
+            subj_frame,
+            text="Session Subject (optional):",
+            fg=FG_TEXT,
+            bg=BG_MAIN,
+            font=self._sub_f_input,
+        ).pack(anchor="w", pady=(0, 5))
+        subject_entry = tk.Entry(
+            subj_frame,
+            font=self._sub_f_input,
+            bg="#2B2B2B",
+            fg=FG_TEXT,
+            insertbackground=FG_TEXT,
+            highlightbackground=FG_DIM,
+            highlightcolor="#2563EB",
+            relief="flat",
+            bd=4,
+        )
         subject_entry.pack(fill="x", ipady=4)
 
         notes_frame = tk.Frame(container, bg=BG_MAIN)
         notes_frame.pack(fill="x", pady=(0, 30))
-        tk.Label(notes_frame, text="Session Notes (optional):", fg=FG_TEXT, bg=BG_MAIN, font=self._sub_f_input).pack(anchor="w", pady=(0, 5))
+        tk.Label(
+            notes_frame,
+            text="Session Notes (optional):",
+            fg=FG_TEXT,
+            bg=BG_MAIN,
+            font=self._sub_f_input,
+        ).pack(anchor="w", pady=(0, 5))
         # Height increased to 9 for a taller text box
-        notes_text = tk.Text(notes_frame, height=9, font=self._sub_f_input, bg="#2B2B2B", fg=FG_TEXT, insertbackground=FG_TEXT, highlightbackground=FG_DIM, highlightcolor="#2563EB", relief="flat", bd=4, wrap="word")
+        notes_text = tk.Text(
+            notes_frame,
+            height=9,
+            font=self._sub_f_input,
+            bg="#2B2B2B",
+            fg=FG_TEXT,
+            insertbackground=FG_TEXT,
+            highlightbackground=FG_DIM,
+            highlightcolor="#2563EB",
+            relief="flat",
+            bd=4,
+            wrap="word",
+        )
         notes_text.pack(fill="x")
 
         # BULLETPROOF CENTERED BUTTONS (Gap between Submit & Cancel locked to dead center)
@@ -2206,23 +2436,63 @@ class GameLedgerApp(ctk.CTk):
         # Left Column (Hugs the center gap, holds Check, X, and Submit)
         left_side = tk.Frame(btn_row, bg=BG_MAIN)
         left_side.grid(row=0, column=0, sticky="e", padx=(0, 5))
-        
-        btn_chk = ctk.CTkButton(left_side, text="✓", width=40, height=40, fg_color="transparent", border_width=2, cursor="hand2")
+
+        btn_chk = ctk.CTkButton(
+            left_side,
+            text="✓",
+            width=40,
+            height=40,
+            fg_color="transparent",
+            border_width=2,
+            cursor="hand2",
+        )
         btn_chk.pack(side="left", padx=(0, 8))
-        
-        btn_x = ctk.CTkButton(left_side, text="X", width=40, height=40, fg_color="transparent", border_width=2, cursor="hand2")
+
+        btn_x = ctk.CTkButton(
+            left_side,
+            text="X",
+            width=40,
+            height=40,
+            fg_color="transparent",
+            border_width=2,
+            cursor="hand2",
+        )
         btn_x.pack(side="left", padx=(0, 16))
 
-        def prompt_submit(): self._show_modal_popup("Submit?", None, do_submit)
-        btn_submit = ctk.CTkButton(left_side, text="Submit", width=120, height=40, fg_color=TIMER_PLAY_GREEN, hover_color=TIMER_PLAY_GREEN_HOVER, cursor="hand2", font=self._sub_f_btn, command=prompt_submit)
+        def prompt_submit():
+            self._show_modal_popup("Submit?", None, do_submit)
+
+        btn_submit = ctk.CTkButton(
+            left_side,
+            text="Submit",
+            width=120,
+            height=40,
+            fg_color=TIMER_PLAY_GREEN,
+            hover_color=TIMER_PLAY_GREEN_HOVER,
+            cursor="hand2",
+            font=self._sub_f_btn,
+            command=prompt_submit,
+        )
         btn_submit.pack(side="left")
 
         # Right Column (Hugs the center gap, holds Cancel)
         right_side = tk.Frame(btn_row, bg=BG_MAIN)
         right_side.grid(row=0, column=1, sticky="w", padx=(5, 0))
 
-        def prompt_cancel(): self._show_modal_popup("Are You Sure?", None, do_cancel)
-        btn_cancel = ctk.CTkButton(right_side, text="Cancel", width=120, height=40, fg_color="#737373", hover_color="#525252", cursor="hand2", font=self._sub_f_btn, command=prompt_cancel)
+        def prompt_cancel():
+            self._show_modal_popup("Are You Sure?", None, do_cancel)
+
+        btn_cancel = ctk.CTkButton(
+            right_side,
+            text="Cancel",
+            width=120,
+            height=40,
+            fg_color="#737373",
+            hover_color="#525252",
+            cursor="hand2",
+            font=self._sub_f_btn,
+            command=prompt_cancel,
+        )
         btn_cancel.pack(side="left")
 
         # --- Dynamic Resizing Logic ---
@@ -2231,13 +2501,14 @@ class GameLedgerApp(ctk.CTk):
 
         def _flush_sub_resize():
             self._sub_resize_job = None
-            if not self._sub_pending_stage or not main_bg.winfo_exists(): return
+            if not self._sub_pending_stage or not main_bg.winfo_exists():
+                return
             w, h = self._sub_pending_stage
             self._sub_pending_stage = None
-            
+
             # Floor the scale at 1.0 so it never shrinks below the spacious layout on small laptops
             scale = min(w / 1000.0, h / 650.0)
-            scale = max(1.0, min(scale, 2.5)) 
+            scale = max(1.0, min(scale, 2.5))
 
             self._sub_f_title.configure(size=int(16 * scale))
             self._sub_f_game.configure(size=int(22 * scale))
@@ -2248,7 +2519,7 @@ class GameLedgerApp(ctk.CTk):
 
             # Reduced from 350 to 280 to force wrapping before hitting edges
             sub_lbl_game.configure(wraplength=int(280 * scale))
-            
+
             btn_w, btn_h, s_btn = int(120 * scale), int(40 * scale), int(40 * scale)
             btn_submit.configure(width=btn_w, height=btn_h)
             btn_cancel.configure(width=btn_w, height=btn_h)
@@ -2256,7 +2527,8 @@ class GameLedgerApp(ctk.CTk):
             btn_x.configure(width=s_btn, height=s_btn)
 
         def _on_sub_configure(event):
-            if event.width <= 1 or event.height <= 1: return
+            if event.width <= 1 or event.height <= 1:
+                return
             self._sub_pending_stage = (event.width, event.height)
             if self._sub_resize_job is None:
                 self._sub_resize_job = self.after(16, _flush_sub_resize)
@@ -2270,7 +2542,9 @@ class GameLedgerApp(ctk.CTk):
         def do_submit():
             subj = subject_entry.get().strip()
             notes = notes_text.get("1.0", "end").strip()
-            self.session_service.log_play_session(game.id, today_str, recorded_seconds, subj, notes)
+            self.session_service.log_play_session(
+                game.id, today_str, recorded_seconds, subj, notes
+            )
             self._scroll_to_bottom_pending = True
             self.transition_to(self.build_main_hub, game)
 
@@ -2284,7 +2558,7 @@ class GameLedgerApp(ctk.CTk):
         self._cancel_hover_overlay()
         self._active_scroll_canvas = None
         self._details_sync_fn = None
-        
+
         for widget in self.winfo_children():
             widget.destroy()
 
@@ -2303,18 +2577,32 @@ class GameLedgerApp(ctk.CTk):
         header = tk.Frame(container, bg=BG_MAIN)
         header.pack(fill="x", pady=(0, 40))
         header.grid_columnconfigure(0, weight=1)
-        header.grid_columnconfigure(1, weight=0) 
+        header.grid_columnconfigure(1, weight=0)
         header.grid_columnconfigure(2, weight=1)
 
-        tk.Label(header, text="Game:", fg=FG_TEXT, bg=BG_MAIN, font=f_title).grid(row=0, column=0, sticky="s")
-        tk.Label(header, text="Session Time:", fg=FG_TEXT, bg=BG_MAIN, font=f_title).grid(row=0, column=1, sticky="s")
-        tk.Label(header, text="Session Date:", fg=FG_TEXT, bg=BG_MAIN, font=f_title).grid(row=0, column=2, sticky="s")
+        tk.Label(header, text="Game:", fg=FG_TEXT, bg=BG_MAIN, font=f_title).grid(
+            row=0, column=0, sticky="s"
+        )
+        tk.Label(
+            header, text="Session Time:", fg=FG_TEXT, bg=BG_MAIN, font=f_title
+        ).grid(row=0, column=1, sticky="s")
+        tk.Label(
+            header, text="Session Date:", fg=FG_TEXT, bg=BG_MAIN, font=f_title
+        ).grid(row=0, column=2, sticky="s")
 
-        tk.Label(header, text=game.title, fg=FG_TEXT, bg=BG_MAIN, font=f_game, wraplength=280, justify="center").grid(row=1, column=0, pady=(15,0))
+        tk.Label(
+            header,
+            text=game.title,
+            fg=FG_TEXT,
+            bg=BG_MAIN,
+            font=f_game,
+            wraplength=280,
+            justify="center",
+        ).grid(row=1, column=0, pady=(15, 0))
 
         # Time Editor Slots (Option 2 Clamp Logic)
         time_val_frame = tk.Frame(header, bg=BG_MAIN)
-        time_val_frame.grid(row=1, column=1, pady=(15,0))
+        time_val_frame.grid(row=1, column=1, pady=(15, 0))
 
         total_cs = max(0, int(session.duration_seconds * 100))
         init_ms = total_cs % 100
@@ -2325,23 +2613,38 @@ class GameLedgerApp(ctk.CTk):
 
         def make_time_entry(parent, init_val, max_val):
             var = tk.StringVar(value=f"{init_val:02d}")
-            entry = tk.Entry(parent, textvariable=var, width=3, font=f_time_input, bg="#2B2B2B", fg=FG_TEXT, insertbackground=FG_TEXT, highlightbackground=FG_DIM, highlightcolor="#2563EB", relief="flat", bd=4, justify="center")
-            
+            entry = tk.Entry(
+                parent,
+                textvariable=var,
+                width=3,
+                font=f_time_input,
+                bg="#2B2B2B",
+                fg=FG_TEXT,
+                insertbackground=FG_TEXT,
+                highlightbackground=FG_DIM,
+                highlightcolor="#2563EB",
+                relief="flat",
+                bd=4,
+                justify="center",
+            )
+
             def clamp_input(event=None):
                 val = var.get()
-                clean = ''.join(filter(str.isdigit, val))
+                clean = "".join(filter(str.isdigit, val))
                 if not clean:
                     var.set("00")
                     return
                 num = int(clean)
-                if num > max_val: num = max_val
+                num = min(num, max_val)
                 var.set(f"{num:02d}")
 
             def on_key(e):
                 val = var.get()
-                clean = ''.join(filter(str.isdigit, val))
-                if val != clean: var.set(clean)
-                if clean and int(clean) > max_val: var.set(str(max_val))
+                clean = "".join(filter(str.isdigit, val))
+                if val != clean:
+                    var.set(clean)
+                if clean and int(clean) > max_val:
+                    var.set(str(max_val))
 
             entry.bind("<FocusOut>", clamp_input)
             entry.bind("<KeyRelease>", on_key)
@@ -2354,27 +2657,69 @@ class GameLedgerApp(ctk.CTk):
 
         sep_font = tkfont.Font(family="Segoe UI", size=24, weight="bold")
         ent_h.pack(side="left")
-        tk.Label(time_val_frame, text=":", fg=FG_TEXT, bg=BG_MAIN, font=sep_font).pack(side="left", padx=4)
+        tk.Label(time_val_frame, text=":", fg=FG_TEXT, bg=BG_MAIN, font=sep_font).pack(
+            side="left", padx=4
+        )
         ent_m.pack(side="left")
-        tk.Label(time_val_frame, text=":", fg=FG_TEXT, bg=BG_MAIN, font=sep_font).pack(side="left", padx=4)
+        tk.Label(time_val_frame, text=":", fg=FG_TEXT, bg=BG_MAIN, font=sep_font).pack(
+            side="left", padx=4
+        )
         ent_s.pack(side="left")
-        tk.Label(time_val_frame, text=".", fg=FG_TEXT, bg=BG_MAIN, font=sep_font).pack(side="left", padx=4, anchor="s")
+        tk.Label(time_val_frame, text=".", fg=FG_TEXT, bg=BG_MAIN, font=sep_font).pack(
+            side="left", padx=4, anchor="s"
+        )
         ent_ms.pack(side="left", anchor="s")
 
-        tk.Label(header, text=session.date, fg=FG_TEXT, bg=BG_MAIN, font=f_game).grid(row=1, column=2, pady=(15,0))
+        tk.Label(header, text=session.date, fg=FG_TEXT, bg=BG_MAIN, font=f_game).grid(
+            row=1, column=2, pady=(15, 0)
+        )
 
         # Edit Inputs
         subj_frame = tk.Frame(container, bg=BG_MAIN)
         subj_frame.pack(fill="x", pady=(10, 20))
-        tk.Label(subj_frame, text="Session Subject (optional):", fg=FG_TEXT, bg=BG_MAIN, font=f_input).pack(anchor="w", pady=(0, 5))
-        subject_entry = tk.Entry(subj_frame, font=f_input, bg="#2B2B2B", fg=FG_TEXT, insertbackground=FG_TEXT, highlightbackground=FG_DIM, highlightcolor="#2563EB", relief="flat", bd=4)
+        tk.Label(
+            subj_frame,
+            text="Session Subject (optional):",
+            fg=FG_TEXT,
+            bg=BG_MAIN,
+            font=f_input,
+        ).pack(anchor="w", pady=(0, 5))
+        subject_entry = tk.Entry(
+            subj_frame,
+            font=f_input,
+            bg="#2B2B2B",
+            fg=FG_TEXT,
+            insertbackground=FG_TEXT,
+            highlightbackground=FG_DIM,
+            highlightcolor="#2563EB",
+            relief="flat",
+            bd=4,
+        )
         subject_entry.pack(fill="x", ipady=4)
         subject_entry.insert(0, session.subject)
 
         notes_frame = tk.Frame(container, bg=BG_MAIN)
         notes_frame.pack(fill="x", pady=(0, 30))
-        tk.Label(notes_frame, text="Session Notes (optional):", fg=FG_TEXT, bg=BG_MAIN, font=f_input).pack(anchor="w", pady=(0, 5))
-        notes_text = tk.Text(notes_frame, height=9, font=f_input, bg="#2B2B2B", fg=FG_TEXT, insertbackground=FG_TEXT, highlightbackground=FG_DIM, highlightcolor="#2563EB", relief="flat", bd=4, wrap="word")
+        tk.Label(
+            notes_frame,
+            text="Session Notes (optional):",
+            fg=FG_TEXT,
+            bg=BG_MAIN,
+            font=f_input,
+        ).pack(anchor="w", pady=(0, 5))
+        notes_text = tk.Text(
+            notes_frame,
+            height=9,
+            font=f_input,
+            bg="#2B2B2B",
+            fg=FG_TEXT,
+            insertbackground=FG_TEXT,
+            highlightbackground=FG_DIM,
+            highlightcolor="#2563EB",
+            relief="flat",
+            bd=4,
+            wrap="word",
+        )
         notes_text.pack(fill="x")
         notes_text.insert("1.0", session.notes)
 
@@ -2386,68 +2731,134 @@ class GameLedgerApp(ctk.CTk):
 
         left_side = tk.Frame(btn_row, bg=BG_MAIN)
         left_side.grid(row=0, column=0, sticky="e", padx=(0, 5))
-        
-        ctk.CTkButton(left_side, text="✓", width=40, height=40, fg_color="transparent", border_width=2, cursor="hand2").pack(side="left", padx=(0, 8))
-        ctk.CTkButton(left_side, text="X", width=40, height=40, fg_color="transparent", border_width=2, cursor="hand2").pack(side="left", padx=(0, 16))
+
+        ctk.CTkButton(
+            left_side,
+            text="✓",
+            width=40,
+            height=40,
+            fg_color="transparent",
+            border_width=2,
+            cursor="hand2",
+        ).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(
+            left_side,
+            text="X",
+            width=40,
+            height=40,
+            fg_color="transparent",
+            border_width=2,
+            cursor="hand2",
+        ).pack(side="left", padx=(0, 16))
 
         def do_cancel():
             self.transition_to(self.build_main_hub, game)
 
         def do_save():
-            self.focus_set() # Force Entry clamps to finalize
+            self.focus_set()  # Force Entry clamps to finalize
             h, m = int(var_h.get() or "0"), int(var_m.get() or "0")
             s, ms = int(var_s.get() or "0"), int(var_ms.get() or "0")
             new_dur = (h * 3600) + (m * 60) + s + (ms / 100.0)
-            
+
             session.duration_seconds = new_dur
             session.duration_hours = new_dur / 3600.0
             session.subject = subject_entry.get().strip()
             session.notes = notes_text.get("1.0", "end").strip()
-            
+
             self.session_service.edit_play_session(session)
             self.transition_to(self.build_main_hub, game)
 
         def prompt_save():
             self._show_modal_popup("Save Changes?", None, do_save)
 
-        ctk.CTkButton(left_side, text="Save", width=120, height=40, fg_color=TIMER_PLAY_GREEN, hover_color=TIMER_PLAY_GREEN_HOVER, cursor="hand2", font=f_btn, command=prompt_save).pack(side="left")
+        ctk.CTkButton(
+            left_side,
+            text="Save",
+            width=120,
+            height=40,
+            fg_color=TIMER_PLAY_GREEN,
+            hover_color=TIMER_PLAY_GREEN_HOVER,
+            cursor="hand2",
+            font=f_btn,
+            command=prompt_save,
+        ).pack(side="left")
 
         right_side = tk.Frame(btn_row, bg=BG_MAIN)
         right_side.grid(row=0, column=1, sticky="w", padx=(5, 0))
 
         # Cancel skips modal (D7)
-        ctk.CTkButton(right_side, text="Cancel", width=120, height=40, fg_color="#737373", hover_color="#525252", cursor="hand2", font=f_btn, command=do_cancel).pack(side="left")
+        ctk.CTkButton(
+            right_side,
+            text="Cancel",
+            width=120,
+            height=40,
+            fg_color="#737373",
+            hover_color="#525252",
+            cursor="hand2",
+            font=f_btn,
+            command=do_cancel,
+        ).pack(side="left")
 
     def _show_modal_popup(self, text, subtext, on_yes):
         # Anchor overlay directly to 'self' (root window) to guarantee dead-center placement
-        overlay = tk.Frame(self, bg=BG_MAIN, highlightbackground=FG_DIM, highlightthickness=2)
+        overlay = tk.Frame(
+            self, bg=BG_MAIN, highlightbackground=FG_DIM, highlightthickness=2
+        )
         overlay.place(relx=0.5, rely=0.5, anchor="center", width=420, height=200)
-        
+
         # Natively routes all events to this popup, perfectly blocking clicks behind it
         overlay.grab_set()
 
-        tk.Label(overlay, text=text, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 20)).pack(pady=(25, 5))
-        
+        tk.Label(
+            overlay, text=text, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 20)
+        ).pack(pady=(25, 5))
+
         if subtext:
             # ADDED: wraplength=380 and justify="center" prevents any visual text cutoffs
-            tk.Label(overlay, text=subtext, fg=FG_DIM, bg=BG_MAIN, font=("Segoe UI", 10), wraplength=380, justify="center").pack(pady=(0, 20))
+            tk.Label(
+                overlay,
+                text=subtext,
+                fg=FG_DIM,
+                bg=BG_MAIN,
+                font=("Segoe UI", 10),
+                wraplength=380,
+                justify="center",
+            ).pack(pady=(0, 20))
         else:
-            tk.Frame(overlay, bg=BG_MAIN, height=20).pack(pady=(0, 20)) # spacer
+            tk.Frame(overlay, bg=BG_MAIN, height=20).pack(pady=(0, 20))  # spacer
 
         btn_row = tk.Frame(overlay, bg=BG_MAIN)
         btn_row.pack()
-        
+
         def yes_click():
             overlay.grab_release()
             overlay.destroy()
             on_yes()
-            
+
         def no_click():
             overlay.grab_release()
             overlay.destroy()
 
-        ctk.CTkButton(btn_row, text="Yes", width=80, height=36, fg_color=TIMER_PLAY_GREEN, hover_color=TIMER_PLAY_GREEN_HOVER, cursor="hand2", command=yes_click).pack(side="left", padx=10)
-        ctk.CTkButton(btn_row, text="No", width=80, height=36, fg_color=TIMER_STOP_RED, hover_color=TIMER_STOP_RED_HOVER, cursor="hand2", command=no_click).pack(side="left", padx=10)
+        ctk.CTkButton(
+            btn_row,
+            text="Yes",
+            width=80,
+            height=36,
+            fg_color=TIMER_PLAY_GREEN,
+            hover_color=TIMER_PLAY_GREEN_HOVER,
+            cursor="hand2",
+            command=yes_click,
+        ).pack(side="left", padx=10)
+        ctk.CTkButton(
+            btn_row,
+            text="No",
+            width=80,
+            height=36,
+            fg_color=TIMER_STOP_RED,
+            hover_color=TIMER_STOP_RED_HOVER,
+            cursor="hand2",
+            command=no_click,
+        ).pack(side="left", padx=10)
 
     # ==========================================
     #             SCREEN 2: ADDING GAME
@@ -2522,7 +2933,9 @@ class GameLedgerApp(ctk.CTk):
             command=lambda: self._paginate_transition(1),
         )
 
-        self.carousel_viewport = ctk.CTkFrame(self.catalog_frame, fg_color="transparent")
+        self.carousel_viewport = ctk.CTkFrame(
+            self.catalog_frame, fg_color="transparent"
+        )
         self.carousel_viewport.grid(row=0, column=1, sticky="nsew")
 
         self.center_container = ctk.CTkFrame(
@@ -2611,9 +3024,12 @@ class GameLedgerApp(ctk.CTk):
             filtered = []
             for g in results:
                 is_sp, is_mp = self._parse_modes(g)
-                if self.active_filter == "Single-Player" and is_sp:
-                    filtered.append(g)
-                elif self.active_filter == "Multi-Player" and is_mp:
+                if (
+                    self.active_filter == "Single-Player"
+                    and is_sp
+                    or self.active_filter == "Multi-Player"
+                    and is_mp
+                ):
                     filtered.append(g)
             self.catalog_results = filtered
         else:

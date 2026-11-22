@@ -4,15 +4,17 @@ from typing import Any
 from domain.game import Game
 from domain.session import PlaySession
 
+
 class CatalogRepository(ABC):
     @abstractmethod
     def search_catalog(self, query: str) -> list[dict[str, Any]]: ...
-    
+
     @abstractmethod
     def get_catalog_item(self, catalog_id: str) -> dict[str, Any] | None: ...
 
     @abstractmethod
     def get_all_catalog(self) -> list[dict[str, Any]]: ...
+
 
 class GameRepository(ABC):
     @abstractmethod
@@ -34,10 +36,11 @@ class GameRepository(ABC):
     @abstractmethod
     def delete_game(self, game_id: int) -> None: ...
 
+
 class SessionRepository(ABC):
     @abstractmethod
     def save_session(self, session: PlaySession) -> PlaySession: ...
-    
+
     @abstractmethod
     def get_sessions_for_game(self, game_id: int) -> list[PlaySession]: ...
 

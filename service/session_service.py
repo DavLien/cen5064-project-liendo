@@ -1,6 +1,7 @@
 from data.interfaces import GameRepository, SessionRepository
 from domain.session import PlaySession
 
+
 class SessionService:
     def __init__(self, session_repo: SessionRepository, game_repo: GameRepository):
         self.session_repo = session_repo
@@ -18,7 +19,14 @@ class SessionService:
                 game.status = "Backlog"
             self.game_repo.update_game(game)
 
-    def log_play_session(self, game_id: int, date: str, duration_seconds: float, subject: str = "", notes: str = "") -> PlaySession:
+    def log_play_session(
+        self,
+        game_id: int,
+        date: str,
+        duration_seconds: float,
+        subject: str = "",
+        notes: str = "",
+    ) -> PlaySession:
         if duration_seconds <= 0:
             raise ValueError("Session duration must be greater than zero.")
 
@@ -40,11 +48,11 @@ class SessionService:
             duration_hours=duration_hours,
             subject=subject,
             notes=notes,
-            duration_seconds=duration_seconds
+            duration_seconds=duration_seconds,
         )
-        
+
         return self.session_repo.save_session(session)
-        
+
     def get_sessions_for_game(self, game_id: int) -> list[PlaySession]:
         return self.session_repo.get_sessions_for_game(game_id)
 
@@ -54,7 +62,7 @@ class SessionService:
         Triggered when a user clicks 'Permanently Wipe Data'.
         """
         self.session_repo.delete_sessions_for_game(game_id)
-        
+
         # Reset game hours to 0 since all sessions are wiped
         game = self.game_repo.get_game(game_id)
         if game:

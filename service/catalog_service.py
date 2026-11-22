@@ -1,6 +1,8 @@
 from typing import Any
+
 from data.interfaces import CatalogRepository, GameRepository
 from domain.game import Game
+
 
 class CatalogService:
     def __init__(self, catalog_repo: CatalogRepository, game_repo: GameRepository):
@@ -41,7 +43,7 @@ class CatalogService:
             title=title,
             platform=platform_str,
             game_modes=catalog_record.get("game_modes", []),
-            status="Backlog"
+            status="Backlog",
         )
         return self.game_repo.save_game(game)
 
@@ -56,7 +58,11 @@ class CatalogService:
 
     def get_backlog(self) -> list[Game]:
         # Only fetch active games to populate the sidebar (hides archived games)
-        return [g for g in self.game_repo.get_all_games() if not g.status.startswith("Archived_")]
+        return [
+            g
+            for g in self.game_repo.get_all_games()
+            if not g.status.startswith("Archived_")
+        ]
 
     def remove_game(self, game_id: int):
         """
@@ -64,7 +70,8 @@ class CatalogService:
         Otherwise, archive the status so sessions are preserved and it restores exactly where it left off.
         """
         game = self.game_repo.get_game(game_id)
-        if not game: return
+        if not game:
+            return
 
         if game.status == "Backlog":
             self.game_repo.delete_game(game_id)
