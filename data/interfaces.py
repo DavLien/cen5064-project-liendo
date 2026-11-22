@@ -3,6 +3,7 @@ from typing import Any
 
 from domain.game import Game
 from domain.session import PlaySession
+from domain.review import GameReview
 
 
 class CatalogRepository(ABC):
@@ -52,3 +53,13 @@ class SessionRepository(ABC):
 
     @abstractmethod
     def delete_session(self, session_id: int) -> None: ...
+
+class ReviewRepository(ABC):
+    @abstractmethod
+    def save_review(self, review: GameReview) -> GameReview: ...
+
+    @abstractmethod
+    def get_review_for_game(self, game_id: int) -> GameReview | None: ...
+
+    @abstractmethod
+    def delete_review(self, review_id: int) -> None: ...

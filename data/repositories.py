@@ -4,9 +4,10 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from data.interfaces import CatalogRepository, GameRepository, SessionRepository
+from data.interfaces import CatalogRepository, GameRepository, SessionRepository, ReviewRepository
 from domain.game import Game
 from domain.session import PlaySession
+from domain.review import GameReview
 
 
 class JsonCatalogRepository(CatalogRepository):
@@ -275,4 +276,63 @@ class SqliteSessionRepository(SessionRepository):
         query = "DELETE FROM play_sessions WHERE id = ?"
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(query, (session_id,))
+            conn.commit()
+
+class SqliteReviewRepository(ReviewRepository):
+    """Manages saving and loading game reviews and ratings."""
+
+    def __init__(self, db_path: str = "data/gameledger.db"):
+        self.db_path = db_path
+        self._initialize_database()
+
+    def _initialize_database(self):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS reviews (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    game_id INTEGER UNIQUE NOT NULL,
+                    rating REAL,
+                    review_text TEXT,
+                    abandoned_reason TEXT,
+                    FOREIGN KEY(game_id) REFERENCES games(id) ON DELETE CASCADE
+                )
+            """)
+            conn.commit()
+
+    def save_review(self, review: GameReview) -> GameReview:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO reviews (game_id, rating, review_text, abandoned_reason)
+                VALUES (?, ?, ?, ?)
+            """, (review.game_id, review.rating, review.review_text, review.abandoned_reason))
+            conn.commit()
+            review.id = cursor.lastrowid
+        return review
+
+    def get_review_for_game(self, game_id: int) -> GameReview | None:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, game_id, rating, review_text, abandoned_reason 
+                FROM reviews 
+                WHERE game_id = ?
+            """, (game_id,))
+            row = cursor.fetchone()
+
+            if row:
+                return GameReview(
+                    id=row[0],
+                    game_id=row[1],
+                    rating=row[2],
+                    review_text=row[3],
+                    abandoned_reason=row[4]
+                )
+            return None
+
+    def delete_review(self, review_id: int) -> None:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM reviews WHERE id = ?", (review_id,))
             conn.commit()
