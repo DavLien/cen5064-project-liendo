@@ -85,9 +85,7 @@ class ReviewService:
             raise ValueError(f"Game with ID {game_id} not found.")
 
         if game.status not in ("Completed", "Abandoned"):
-            raise ValueError(
-                f"Cannot resume game. Current status is '{game.status}'. Must be 'Completed' or 'Abandoned'."
-            )
+            raise ValueError(f"Cannot resume game. Current status is '{game.status}'. Must be 'Completed' or 'Abandoned'.")
 
         game.status = "In Progress"
         self.game_repo.update_game(game)

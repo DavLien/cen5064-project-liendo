@@ -1112,6 +1112,7 @@ class GameLedgerApp(ctk.CTk):
         sessions = self.session_service.get_sessions_for_game(game.id)
         has_sessions = len(sessions) > 0
 
+        # Always fetch so historical reviews remain visible when the game is resumed
         review = self.review_service.review_repo.get_review_for_game(game.id)
 
         def start_new_session(g=game):
@@ -1462,15 +1463,11 @@ class GameLedgerApp(ctk.CTk):
                 status_text = "Abandoned"
                 status_color = TIMER_STOP_RED
             else:
-                # The game is resumed ("In Progress"). We infer its historical status
+                # The game is resumed ("In Progress"). We infer its historical status 
                 # based on whether the review has a star rating attached.
-                is_historical_completion = bool(
-                    review_obj and review_obj.rating is not None
-                )
+                is_historical_completion = bool(review_obj and review_obj.rating is not None)
                 status_text = "Completed" if is_historical_completion else "Abandoned"
-                status_color = (
-                    TIMER_PLAY_GREEN if is_historical_completion else TIMER_STOP_RED
-                )
+                status_color = TIMER_PLAY_GREEN if is_historical_completion else TIMER_STOP_RED
 
             dot_col = status_color if review_obj else "#2563EB"
             raw_date = session_obj.date if session_obj else review_obj.date
