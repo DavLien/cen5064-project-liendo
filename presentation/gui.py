@@ -1068,7 +1068,7 @@ class GameLedgerApp(ctk.CTk):
         self.render_sidebar()
 
     # ==========================================
-    #      INLINE GAME DETAILS & REMOVE (B2-B5)
+    #      INLINE GAME DETAILS & REMOVE
     # ==========================================
     def render_inline_game_details(self, game):
         self._details_sync_fn = None
@@ -1772,7 +1772,7 @@ class GameLedgerApp(ctk.CTk):
         self.render_recently_played()
 
     # ==========================================
-    #       SCREEN 4: STOPWATCH TIMER (B6-B10)
+    #       SCREEN 4: STOPWATCH TIMER
     # ==========================================
     def _ensure_timer_masters(self):
         """Pre-renders high-resolution master sprites ONCE for silky anti-aliased dynamic scaling."""
@@ -2521,7 +2521,7 @@ class GameLedgerApp(ctk.CTk):
         )
 
     # ==========================================
-    #    SUBMISSION SCREEN (B11-B17)
+    #            SUBMISSION SCREEN
     # ==========================================
     def build_session_submission_screen(
         self,
@@ -3002,7 +3002,7 @@ class GameLedgerApp(ctk.CTk):
         cancel_btn.configure(command=lambda e=None: _do_cancel())
 
     # ==========================================
-    #      SESSION EDIT SCREEN (D6-D10)
+    #           SESSION EDIT SCREEN
     # ==========================================
     def build_session_edit_screen(self, game, session):
         self._cancel_hover_overlay()
@@ -3367,7 +3367,7 @@ class GameLedgerApp(ctk.CTk):
         ).pack(side="left", padx=10)
 
     # ==========================================
-    #             SCREEN 2: ADDING GAME
+    #         SCREEN 2: ADDING GAME
     # ==========================================
     def build_adding_game_screen(self):
         self._active_scroll_canvas = None
@@ -3715,7 +3715,7 @@ class GameLedgerApp(ctk.CTk):
         ).grid(row=1, column=0, columnspan=3, pady=40)
 
     # ==========================================
-    #             POPUP 4: SELECT VERSION
+    #          POPUP 4: SELECT VERSION
     # ==========================================
     def open_platform_popup(self, game_dict):
         dialog = ctk.CTkToplevel(self)
