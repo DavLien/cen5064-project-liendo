@@ -1236,10 +1236,11 @@ class GameLedgerApp(ctk.CTk):
                 self.resume_menu.place(x=x, y=y)
                 self.resume_menu.lift()
 
-        if game.status == "Completed":
+        if game.status in ("Completed", "Abandoned"):
+            btn_txt = "✓ Completed v" if game.status == "Completed" else "X Abandoned v"
             comp_btn = ctk.CTkButton(
                 btn_row,
-                text="✓ Completed v",
+                text=btn_txt,
                 fg_color="transparent",
                 border_width=2,
                 cursor="hand2",
@@ -1275,10 +1276,20 @@ class GameLedgerApp(ctk.CTk):
                 fg_color="transparent",
                 border_width=2,
                 cursor="hand2",
-                command=lambda: self.transition_to(
+                command=lambda e=None: self.transition_to(
                     self.build_rating_review_screen, game
                 ),
             ).pack(side="left", padx=2)
+
+            def prompt_standalone_abandon():
+                self._show_modal_popup(
+                    "Are you sure you want to abandon this game?",
+                    None,
+                    lambda: self.transition_to(self.build_abandon_review_screen, game),
+                    "Abandon",
+                    "Cancel",
+                )
+
             ctk.CTkButton(
                 btn_row,
                 text="X",
@@ -1286,6 +1297,7 @@ class GameLedgerApp(ctk.CTk):
                 fg_color="transparent",
                 border_width=2,
                 cursor="hand2",
+                command=prompt_standalone_abandon,
             ).pack(side="left", padx=2)
 
         dots_btn = ctk.CTkButton(
@@ -1445,7 +1457,12 @@ class GameLedgerApp(ctk.CTk):
             left_f = tk.Frame(main_row, bg=BG_MAIN)
             left_f.pack(side="left", padx=(10, 0))
 
-            dot_col = TIMER_PLAY_GREEN if review_obj else "#2563EB"
+            status_text = "Completed" if game.status == "Completed" else "Abandoned"
+            status_color = (
+                TIMER_PLAY_GREEN if game.status == "Completed" else TIMER_STOP_RED
+            )
+
+            dot_col = status_color if review_obj else "#2563EB"
             # Extract just the Date from the exact timestamp for UI cleanliness
             raw_date = session_obj.date if session_obj else review_obj.date
             clean_date = (
@@ -1494,34 +1511,33 @@ class GameLedgerApp(ctk.CTk):
                 edit_btn.pack(side="left", padx=(0, 4))
                 ToolTip(edit_btn, "Edit Session")
 
-            def on_delete_row():
-                if session_obj:
-                    self.session_service.delete_play_session(session_obj.id, game.id)
-                if review_obj:
-                    self.review_service.review_repo.delete_review(review_obj.id)
-
-                # Check actual DB state AFTER deletion to set the correct fallback status
+            def on_delete_session():
+                self.session_service.delete_play_session(session_obj.id, game.id)
                 remaining_sessions = len(
                     self.session_service.get_sessions_for_game(game.id)
                 )
-                has_review_now = (
+                has_review = (
                     self.review_service.review_repo.get_review_for_game(game.id)
                     is not None
                 )
-
-                # Safely cascade the status
-                if has_review_now:
-                    new_status = "Completed"
-                elif remaining_sessions > 0:
-                    new_status = "In Progress"
-                else:
-                    new_status = "Backlog"
-
-                self.service.update_game_status(game.id, new_status)
-
+                if remaining_sessions == 0 and not has_review:
+                    self.service.update_game_status(game.id, "Backlog")
                 fresh_game = self.service.game_repo.get_game(game.id)
                 self.render_sidebar()
                 self.render_inline_game_details(fresh_game)
+
+            def on_delete_review():
+                self.review_service.review_repo.delete_review(review_obj.id)
+                remaining_sessions = len(
+                    self.session_service.get_sessions_for_game(game.id)
+                )
+                new_status = "In Progress" if remaining_sessions > 0 else "Backlog"
+                self.service.update_game_status(game.id, new_status)
+                fresh_game = self.service.game_repo.get_game(game.id)
+                self.render_sidebar()
+                self.render_inline_game_details(fresh_game)
+
+            active_delete_cmd = on_delete_session if session_obj else on_delete_review
 
             delete_btn = ctk.CTkButton(
                 actions_f,
@@ -1532,7 +1548,7 @@ class GameLedgerApp(ctk.CTk):
                 hover_color=TIMER_STOP_RED_HOVER,
                 text_color=TIMER_STOP_RED,
                 cursor="hand2",
-                command=on_delete_row,
+                command=active_delete_cmd,
             )
             delete_btn.pack(side="left", padx=(0, 8))
             ToolTip(delete_btn, "Delete")
@@ -1544,8 +1560,8 @@ class GameLedgerApp(ctk.CTk):
                 status_f.pack(side="left")
                 tk.Label(
                     status_f,
-                    text="Completed",
-                    fg=TIMER_PLAY_GREEN,
+                    text=status_text,
+                    fg=status_color,
                     bg=BG_MAIN,
                     font=("Segoe UI", 11),
                 ).pack(side="left", anchor="s", padx=(0, 10))
@@ -2697,8 +2713,9 @@ class GameLedgerApp(ctk.CTk):
         btn_x.pack(side="left", padx=(0, 16))
 
         self._mark_completed_toggled = mark_completed_active
+        self._mark_abandoned_toggled = False
 
-        def update_chk_btn():
+        def update_toggle_btns():
             if self._mark_completed_toggled:
                 btn_chk.configure(
                     fg_color=TIMER_PLAY_GREEN, hover_color=TIMER_PLAY_GREEN_HOVER
@@ -2706,18 +2723,33 @@ class GameLedgerApp(ctk.CTk):
             else:
                 btn_chk.configure(fg_color="transparent", hover_color=BG_SELECTED)
 
-        def toggle_chk():
+            if self._mark_abandoned_toggled:
+                btn_x.configure(
+                    fg_color=TIMER_STOP_RED, hover_color=TIMER_STOP_RED_HOVER
+                )
+            else:
+                btn_x.configure(fg_color="transparent", hover_color=BG_SELECTED)
+
+        def toggle_chk(event=None):
             self._mark_completed_toggled = not self._mark_completed_toggled
-            update_chk_btn()
+            if self._mark_completed_toggled:
+                self._mark_abandoned_toggled = False
+            update_toggle_btns()
+
+        def toggle_x(event=None):
+            self._mark_abandoned_toggled = not self._mark_abandoned_toggled
+            if self._mark_abandoned_toggled:
+                self._mark_completed_toggled = False
+            update_toggle_btns()
 
         btn_chk.configure(command=toggle_chk)
-        update_chk_btn()
+        btn_x.configure(command=toggle_x)
+        update_toggle_btns()
 
         def do_submit(event=None):
             subj = subject_entry.get().strip()
             notes = notes_text.get("1.0", "end").strip()
 
-            # PREVENT DUPLICATES: If returning from the Review screen via "Cancel", update the existing record
             if existing_session:
                 existing_session.subject = subj
                 existing_session.notes = notes
@@ -2730,6 +2762,10 @@ class GameLedgerApp(ctk.CTk):
 
             if self._mark_completed_toggled:
                 self.transition_to(self.build_rating_review_screen, game, saved_session)
+            elif self._mark_abandoned_toggled:
+                self.transition_to(
+                    self.build_abandon_review_screen, game, saved_session
+                )
             else:
                 self._scroll_to_bottom_pending = True
                 fresh_game = self.service.game_repo.get_game(game.id)
@@ -2992,6 +3028,200 @@ class GameLedgerApp(ctk.CTk):
         post_btn.configure(
             command=lambda e=None: self._show_modal_popup(
                 "Post Review?", None, _do_post
+            )
+        )
+        skip_btn.configure(
+            command=lambda e=None: self._show_modal_popup(
+                "Skip the Rating and Review?", None, _do_skip
+            )
+        )
+        cancel_btn.configure(command=lambda e=None: _do_cancel())
+
+    def build_abandon_review_screen(self, game, pending_session=None):
+        self._cancel_hover_overlay()
+        self._active_scroll_canvas = None
+        self._details_sync_fn = None
+        for widget in self.winfo_children():
+            widget.destroy()
+
+        main_bg = tk.Frame(self, bg=BG_MAIN, highlightthickness=0, bd=0)
+        main_bg.pack(fill="both", expand=True)
+
+        container = tk.Frame(main_bg, bg=BG_MAIN, highlightthickness=0, bd=0)
+        container.place(
+            relx=0.5, rely=0.5, anchor="center", relwidth=0.85, relheight=0.85
+        )
+
+        self._rev_f_title = ctk.CTkFont(family="Segoe UI", size=14)
+        self._rev_f_game = ctk.CTkFont(family="Segoe UI", size=22, weight="bold")
+        self._rev_f_status = ctk.CTkFont(family="Segoe UI", size=28, weight="bold")
+        self._rev_f_btn = ctk.CTkFont(family="Segoe UI", size=16, weight="bold")
+
+        tk.Label(
+            container, text="Game", fg=FG_DIM, bg=BG_MAIN, font=self._rev_f_title
+        ).pack(anchor="w", pady=(0, 2))
+        lbl_game = tk.Label(
+            container,
+            text=game.title,
+            fg=FG_TEXT,
+            bg=BG_MAIN,
+            font=self._rev_f_game,
+            justify="left",
+            wraplength=600,
+        )
+        lbl_game.pack(anchor="w", pady=(0, 15))
+
+        tk.Label(
+            container, text="Status", fg=FG_DIM, bg=BG_MAIN, font=self._rev_f_title
+        ).pack(anchor="w", pady=(0, 2))
+        tk.Label(
+            container,
+            text="Abandoned",
+            fg=TIMER_STOP_RED,
+            bg=BG_MAIN,
+            font=self._rev_f_status,
+        ).pack(anchor="w", pady=(0, 15))
+
+        tk.Label(
+            container, text="Rating", fg=FG_DIM, bg=BG_MAIN, font=self._rev_f_title
+        ).pack(anchor="w", pady=(0, 2))
+        star_widget = StarRatingWidget(container, interactive=True, size=40)
+        star_widget.pack(anchor="w", pady=(0, 15))
+
+        tk.Label(
+            container, text="Review", fg=FG_DIM, bg=BG_MAIN, font=self._rev_f_title
+        ).pack(anchor="w", pady=(0, 2))
+
+        review_box = ctk.CTkTextbox(
+            container, font=("Segoe UI", 15), fg_color="#2B2B2B", text_color=FG_TEXT
+        )
+        review_box.pack(fill="both", expand=True, pady=(0, 25))
+
+        btn_row = tk.Frame(container, bg=BG_MAIN)
+        btn_row.pack(pady=(5, 0))
+
+        post_btn = ctk.CTkButton(
+            btn_row,
+            text="Submit",
+            fg_color="gray",
+            text_color="#d3d3d3",
+            state="disabled",
+            width=140,
+            height=45,
+            font=self._rev_f_btn,
+        )
+        post_btn.pack(side="left", padx=15)
+        skip_btn = ctk.CTkButton(
+            btn_row,
+            text="Skip",
+            fg_color="#555555",
+            hover_color="#333333",
+            width=140,
+            height=45,
+            font=self._rev_f_btn,
+        )
+        skip_btn.pack(side="left", padx=15)
+        cancel_btn = ctk.CTkButton(
+            btn_row,
+            text="Cancel",
+            fg_color="#999999",
+            hover_color="#777777",
+            width=140,
+            height=45,
+            font=self._rev_f_btn,
+        )
+        cancel_btn.pack(side="left", padx=15)
+
+        self._rev_resize_job = None
+        self._rev_pending_stage = None
+
+        def _flush_rev_resize():
+            self._rev_resize_job = None
+            if not self._rev_pending_stage or not main_bg.winfo_exists():
+                return
+            w, h = self._rev_pending_stage
+            self._rev_pending_stage = None
+
+            scale = max(1.0, min(min(w / 1000.0, h / 650.0), 1.4))
+            self._rev_f_title.configure(size=int(14 * scale))
+            self._rev_f_game.configure(size=int(22 * scale))
+            self._rev_f_status.configure(size=int(28 * scale))
+            self._rev_f_btn.configure(size=int(16 * scale))
+            lbl_game.configure(wraplength=int(container.winfo_width() - 20))
+
+            star_widget.set_size(int(40 * scale))
+
+            btn_w, btn_h = int(140 * scale), int(45 * scale)
+            post_btn.configure(width=btn_w, height=btn_h)
+            skip_btn.configure(width=btn_w, height=btn_h)
+            cancel_btn.configure(width=btn_w, height=btn_h)
+
+        def _on_rev_configure(event):
+            if event.width > 1 and event.height > 1:
+                self._rev_pending_stage = (event.width, event.height)
+                if self._rev_resize_job is None:
+                    self._rev_resize_job = self.after(16, _flush_rev_resize)
+
+        main_bg.bind("<Configure>", _on_rev_configure)
+
+        def _check_state(event=None):
+            has_rating = star_widget.value > 0.0
+            has_text = len(review_box.get("1.0", "end-1c").strip()) > 0
+            if has_rating or has_text:
+                post_btn.configure(
+                    state="normal",
+                    fg_color=TIMER_STOP_RED,
+                    text_color="white",
+                    hover_color=TIMER_STOP_RED_HOVER,
+                )
+            else:
+                post_btn.configure(
+                    state="disabled", fg_color="gray", text_color="#d3d3d3"
+                )
+
+        star_widget.command = _check_state
+        review_box.bind("<KeyRelease>", _check_state)
+
+        exact_time_str = (
+            pending_session.date
+            if pending_session
+            else datetime.now().strftime("%B %d, %Y %I:%M:%S %p")
+        )
+
+        def _do_post(event=None):
+            self.review_service.mark_game_abandoned(
+                game.id,
+                exact_time_str,
+                star_widget.value,
+                review_box.get("1.0", "end-1c").strip(),
+                pending_session,
+            )
+            fresh_game = self.service.game_repo.get_game(game.id)
+            self.transition_to(self.build_main_hub, fresh_game)
+
+        def _do_skip(event=None):
+            self.review_service.mark_game_abandoned(
+                game.id, exact_time_str, None, None, pending_session
+            )
+            fresh_game = self.service.game_repo.get_game(game.id)
+            self.transition_to(self.build_main_hub, fresh_game)
+
+        def _do_cancel(event=None):
+            if pending_session:
+                self.transition_to(
+                    self.build_session_submission_screen,
+                    game,
+                    pending_session.duration_seconds,
+                    pending_session,
+                    False,
+                    pending_session.date,
+                )
+            else:
+                self.transition_to(self.build_main_hub, game)
+
+        post_btn.configure(
+            command=lambda e=None: self._show_modal_popup(
+                "Submit Review?", None, _do_post
             )
         )
         skip_btn.configure(
@@ -3305,14 +3535,12 @@ class GameLedgerApp(ctk.CTk):
 
         main_bg.bind("<Configure>", _on_edit_configure)
 
-    def _show_modal_popup(self, text, subtext, on_yes):
-        # Anchor overlay directly to 'self' (root window) to guarantee dead-center placement
+    def _show_modal_popup(self, text, subtext, on_yes, yes_text="Yes", no_text="No"):
         overlay = tk.Frame(
             self, bg=BG_MAIN, highlightbackground=FG_DIM, highlightthickness=2
         )
         overlay.place(relx=0.5, rely=0.5, anchor="center", width=420, height=200)
 
-        # Natively routes all events to this popup, perfectly blocking clicks behind it
         overlay.grab_set()
 
         tk.Label(
@@ -3320,7 +3548,6 @@ class GameLedgerApp(ctk.CTk):
         ).pack(pady=(25, 5))
 
         if subtext:
-            # ADDED: wraplength=380 and justify="center" prevents any visual text cutoffs
             tk.Label(
                 overlay,
                 text=subtext,
@@ -3331,37 +3558,39 @@ class GameLedgerApp(ctk.CTk):
                 justify="center",
             ).pack(pady=(0, 20))
         else:
-            tk.Frame(overlay, bg=BG_MAIN, height=20).pack(pady=(0, 20))  # spacer
+            tk.Frame(overlay, bg=BG_MAIN, height=20).pack(pady=(0, 20))
 
         btn_row = tk.Frame(overlay, bg=BG_MAIN)
         btn_row.pack()
 
-        def yes_click():
+        def yes_click(event=None):
             overlay.grab_release()
             overlay.destroy()
             on_yes()
 
-        def no_click():
+        def no_click(event=None):
             overlay.grab_release()
             overlay.destroy()
 
         ctk.CTkButton(
             btn_row,
-            text="Yes",
+            text=yes_text,
             width=80,
             height=36,
-            fg_color=TIMER_PLAY_GREEN,
-            hover_color=TIMER_PLAY_GREEN_HOVER,
+            fg_color=TIMER_PLAY_GREEN if yes_text != "Abandon" else TIMER_STOP_RED,
+            hover_color=TIMER_PLAY_GREEN_HOVER
+            if yes_text != "Abandon"
+            else TIMER_STOP_RED_HOVER,
             cursor="hand2",
             command=yes_click,
         ).pack(side="left", padx=10)
         ctk.CTkButton(
             btn_row,
-            text="No",
+            text=no_text,
             width=80,
             height=36,
-            fg_color=TIMER_STOP_RED,
-            hover_color=TIMER_STOP_RED_HOVER,
+            fg_color=TIMER_STOP_RED if no_text == "No" else "#737373",
+            hover_color=TIMER_STOP_RED_HOVER if no_text == "No" else "#525252",
             cursor="hand2",
             command=no_click,
         ).pack(side="left", padx=10)
