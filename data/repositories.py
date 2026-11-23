@@ -292,21 +292,26 @@ class SqliteReviewRepository(ReviewRepository):
                 CREATE TABLE IF NOT EXISTS reviews (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     game_id INTEGER UNIQUE NOT NULL,
+                    date TEXT NOT NULL,
                     rating REAL,
                     review_text TEXT,
                     abandoned_reason TEXT,
                     FOREIGN KEY(game_id) REFERENCES games(id) ON DELETE CASCADE
                 )
             """)
+            # Auto-migrate if table exists without date
+            cursor.execute("PRAGMA table_info(reviews)")
+            if "date" not in [row[1] for row in cursor.fetchall()]:
+                conn.execute("ALTER TABLE reviews ADD COLUMN date TEXT DEFAULT ''")
             conn.commit()
 
     def save_review(self, review: GameReview) -> GameReview:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT OR REPLACE INTO reviews (game_id, rating, review_text, abandoned_reason)
-                VALUES (?, ?, ?, ?)
-            """, (review.game_id, review.rating, review.review_text, review.abandoned_reason))
+                INSERT OR REPLACE INTO reviews (game_id, date, rating, review_text, abandoned_reason)
+                VALUES (?, ?, ?, ?, ?)
+            """, (review.game_id, review.date, review.rating, review.review_text, review.abandoned_reason))
             conn.commit()
             review.id = cursor.lastrowid
         return review
@@ -315,7 +320,7 @@ class SqliteReviewRepository(ReviewRepository):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, game_id, rating, review_text, abandoned_reason 
+                SELECT id, game_id, date, rating, review_text, abandoned_reason 
                 FROM reviews 
                 WHERE game_id = ?
             """, (game_id,))
@@ -325,9 +330,10 @@ class SqliteReviewRepository(ReviewRepository):
                 return GameReview(
                     id=row[0],
                     game_id=row[1],
-                    rating=row[2],
-                    review_text=row[3],
-                    abandoned_reason=row[4]
+                    date=row[2],
+                    rating=row[3],
+                    review_text=row[4],
+                    abandoned_reason=row[5]
                 )
             return None
 
