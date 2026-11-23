@@ -4,10 +4,15 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from data.interfaces import CatalogRepository, GameRepository, SessionRepository, ReviewRepository
+from data.interfaces import (
+    CatalogRepository,
+    GameRepository,
+    ReviewRepository,
+    SessionRepository,
+)
 from domain.game import Game
-from domain.session import PlaySession
 from domain.review import GameReview
+from domain.session import PlaySession
 
 
 class JsonCatalogRepository(CatalogRepository):
@@ -278,6 +283,7 @@ class SqliteSessionRepository(SessionRepository):
             conn.execute(query, (session_id,))
             conn.commit()
 
+
 class SqliteReviewRepository(ReviewRepository):
     """Manages saving and loading game reviews and ratings."""
 
@@ -308,10 +314,19 @@ class SqliteReviewRepository(ReviewRepository):
     def save_review(self, review: GameReview) -> GameReview:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT OR REPLACE INTO reviews (game_id, date, rating, review_text, abandoned_reason)
                 VALUES (?, ?, ?, ?, ?)
-            """, (review.game_id, review.date, review.rating, review.review_text, review.abandoned_reason))
+            """,
+                (
+                    review.game_id,
+                    review.date,
+                    review.rating,
+                    review.review_text,
+                    review.abandoned_reason,
+                ),
+            )
             conn.commit()
             review.id = cursor.lastrowid
         return review
@@ -319,11 +334,14 @@ class SqliteReviewRepository(ReviewRepository):
     def get_review_for_game(self, game_id: int) -> GameReview | None:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT id, game_id, date, rating, review_text, abandoned_reason 
                 FROM reviews 
                 WHERE game_id = ?
-            """, (game_id,))
+            """,
+                (game_id,),
+            )
             row = cursor.fetchone()
 
             if row:
@@ -333,7 +351,7 @@ class SqliteReviewRepository(ReviewRepository):
                     date=row[2],
                     rating=row[3],
                     review_text=row[4],
-                    abandoned_reason=row[5]
+                    abandoned_reason=row[5],
                 )
             return None
 

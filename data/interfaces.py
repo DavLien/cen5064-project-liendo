@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from domain.game import Game
-from domain.session import PlaySession
 from domain.review import GameReview
+from domain.session import PlaySession
 
 
 class CatalogRepository(ABC):
@@ -53,6 +53,7 @@ class SessionRepository(ABC):
 
     @abstractmethod
     def delete_session(self, session_id: int) -> None: ...
+
 
 class ReviewRepository(ABC):
     @abstractmethod

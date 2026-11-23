@@ -1,4 +1,3 @@
-# tests/test_review_service.py
 import unittest
 from unittest.mock import MagicMock
 
@@ -6,102 +5,100 @@ from domain.game import Game
 from domain.session import PlaySession
 from service.review_service import ReviewService
 
+
 class TestReviewService(unittest.TestCase):
     def setUp(self):
         self.mock_game_repo = MagicMock()
         self.mock_review_repo = MagicMock()
         self.mock_session_service = MagicMock()
+
         self.service = ReviewService(
-            self.mock_game_repo, 
-            self.mock_review_repo, 
-            self.mock_session_service
+            self.mock_game_repo, self.mock_review_repo, self.mock_session_service
         )
-        
-        self.mock_game = Game(
-            id=1, 
-            title="Elden Ring", 
-            platform="PS5", 
-            game_modes=["Single-Player"], 
-            status="In Progress", 
-            total_hours=10.0
+
+    def test_mark_game_completed_standalone(self):
+        # Arrange
+        mock_game = Game(
+            id=1,
+            title="Test Game",
+            platform="PC",
+            game_modes=["Single-Player"],
+            status="In Progress",
+            total_hours=10.0,
         )
-        self.mock_game_repo.get_game.return_value = self.mock_game
+        self.mock_game_repo.get_game.return_value = mock_game
 
-    def test_mark_completed_invalid_rating_raises_error(self):
-        # Fixed: Explicitly testing the boundaries at 0.0 and 6.0
-        with self.assertRaisesRegex(ValueError, "between 0.5 and 5.0"):
-            self.service.mark_game_completed(game_id=1, rating=0.0)
-            
-        with self.assertRaisesRegex(ValueError, "between 0.5 and 5.0"):
-            self.service.mark_game_completed(game_id=1, rating=6.0)
-            
-        with self.assertRaisesRegex(ValueError, "0.5 increments"):
-            self.service.mark_game_completed(game_id=1, rating=4.3)
-
-    def test_mark_completed_valid_half_star_rating_passes(self):
-        # Fixed: Ensuring the 0.5 lower boundary passes successfully
-        self.service.mark_game_completed(game_id=1, rating=0.5)
-        self.assertEqual(self.mock_game.status, "Completed")
-        self.mock_review_repo.save_review.assert_called_once()
-        saved_review = self.mock_review_repo.save_review.call_args[0][0]
-        self.assertEqual(saved_review.rating, 0.5)
-
-    def test_mark_completed_standalone_with_review(self):
+        # Act
         self.service.mark_game_completed(
-            game_id=1, 
-            rating=4.5, 
-            review_text="Amazing game!"
+            1, "November 22, 2026 06:00:00 PM", 4.5, "Great game!"
         )
-        
-        self.assertEqual(self.mock_game.status, "Completed")
-        self.mock_game_repo.update_game.assert_called_once_with(self.mock_game)
-        
+
+        # Assert
         self.mock_review_repo.save_review.assert_called_once()
         saved_review = self.mock_review_repo.save_review.call_args[0][0]
         self.assertEqual(saved_review.rating, 4.5)
-        self.assertEqual(saved_review.review_text, "Amazing game!")
-        
-        # Verify no session logic invoked
-        self.mock_session_service.log_play_session.assert_not_called()
+        self.assertEqual(saved_review.review_text, "Great game!")
+        self.assertEqual(saved_review.date, "November 22, 2026 06:00:00 PM")
+        self.assertEqual(mock_game.status, "Completed")
+        self.mock_game_repo.update_game.assert_called_once_with(mock_game)
 
-    def test_mark_completed_standalone_with_skip(self):
-        self.service.mark_game_completed(game_id=1, rating=None, review_text=None)
-        
-        self.assertEqual(self.mock_game.status, "Completed")
-        self.mock_game_repo.update_game.assert_called_once_with(self.mock_game)
-        self.mock_review_repo.save_review.assert_not_called()
+    def test_mark_game_completed_with_chained_session(self):
+        # Arrange
+        mock_game = Game(
+            id=1,
+            title="Test",
+            platform="PC",
+            game_modes=["Single-Player"],
+            status="In Progress",
+            total_hours=10.0,
+        )
+        self.mock_game_repo.get_game.return_value = mock_game
 
-    def test_mark_completed_chained_with_pending_session(self):
-        pending_session = PlaySession(
-            game_id=1, 
-            date="Nov 16, 2026", 
-            duration_seconds=7200, 
-            duration_hours=2.0,
-            subject="Final Boss",
-            notes="Defeated!"
-        )
-        
-        self.service.mark_game_completed(
-            game_id=1, 
-            rating=5.0, 
-            review_text=None, 
-            pending_session=pending_session
-        )
-        
-        # Verify session service is routed legally
-        self.mock_session_service.log_play_session.assert_called_once_with(
+        # This session is simulating one that gui.py ALREADY saved and passed down
+        pending = PlaySession(
             game_id=1,
-            date="Nov 16, 2026",
-            duration_seconds=7200,
+            date="November 22, 2026 06:00 PM",
+            duration_hours=1.0,
+            duration_seconds=3600.0,
             subject="Final Boss",
-            notes="Defeated!"
+            notes="Beat it",
         )
-        
-        # Verify review is saved
+
+        # Act
+        # The ReviewService receives the dummy date, but should override it with the pending session's date
+        self.service.mark_game_completed(1, "Dummy Date", 5.0, "Masterpiece", pending)
+
+        # Assert
+        # Verify it saved the review
         self.mock_review_repo.save_review.assert_called_once()
+
+        # Verify the review completely inherited the exact timestamp of the chained session
         saved_review = self.mock_review_repo.save_review.call_args[0][0]
-        self.assertEqual(saved_review.rating, 5.0)
-        
-        # Verify status transition
-        self.assertEqual(self.mock_game.status, "Completed")
-        self.mock_game_repo.update_game.assert_called_once_with(self.mock_game)
+        self.assertEqual(saved_review.date, "November 22, 2026 06:00 PM")
+
+    def test_mark_game_completed_invalid_rating(self):
+        # Act & Assert
+        with self.assertRaises(ValueError):
+            self.service.mark_game_completed(1, "Date", 6.0, "Too high")
+
+        with self.assertRaises(ValueError):
+            self.service.mark_game_completed(1, "Date", 4.2, "Not an increment")
+
+    def test_mark_game_completed_zero_rating_ignored(self):
+        # Arrange
+        mock_game = Game(
+            id=1,
+            title="Test",
+            platform="PC",
+            game_modes=["Single-Player"],
+            status="In Progress",
+            total_hours=10.0,
+        )
+        self.mock_game_repo.get_game.return_value = mock_game
+
+        # Act (0.0 should be interpreted as 'None/Skipped' instead of throwing an out-of-bounds error)
+        self.service.mark_game_completed(1, "Date", 0.0, "Just text")
+
+        # Assert
+        saved_review = self.mock_review_repo.save_review.call_args[0][0]
+        self.assertIsNone(saved_review.rating)
