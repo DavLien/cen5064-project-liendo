@@ -1068,7 +1068,7 @@ class GameLedgerApp(ctk.CTk):
         self.render_sidebar()
 
     # ==========================================
-    #      INLINE GAME DETAILS & REMOVE (B2-B5)
+    #      INLINE GAME DETAILS & REMOVE
     # ==========================================
     def render_inline_game_details(self, game):
         self._details_sync_fn = None
@@ -1100,7 +1100,6 @@ class GameLedgerApp(ctk.CTk):
             (0, 0), window=details_inner, anchor="nw"
         )
 
-        # Fetch dynamic game metadata from games.json via CatalogService
         details = self.service.get_catalog_details_by_title(game.title)
         developer = details.get("developer", "Unknown Developer")
         publisher = details.get("publisher", "Unknown Publisher")
@@ -1110,21 +1109,16 @@ class GameLedgerApp(ctk.CTk):
             "description", "No description available for this title yet."
         )
 
-        # Fetch sessions early
         sessions = self.session_service.get_sessions_for_game(game.id)
         has_sessions = len(sessions) > 0
 
-        # Fetch Game Review if Completed
         review = None
-        if game.status == "Completed":
+        if game.status in ("Completed", "Abandoned"):
             review = self.review_service.review_repo.get_review_for_game(game.id)
 
         def start_new_session(g=game):
             self.after(10, self.transition_to, self.build_timer_screen, g)
 
-        # ---------------------------------------------
-        # TOP ROW: Game Cover + Title + Action Buttons
-        # ---------------------------------------------
         top_section = tk.Frame(details_inner, bg=BG_MAIN, highlightthickness=0, bd=0)
         top_section.pack(fill="x", pady=(10, 20), padx=16)
         top_section.grid_columnconfigure(0, weight=0)
@@ -1141,7 +1135,6 @@ class GameLedgerApp(ctk.CTk):
             font=("Segoe UI", 12, "bold"),
         ).pack(expand=True)
 
-        # Removed height=250 and grid_propagate(False) so the Short Details section isn't pushed down!
         title_section = tk.Frame(top_section, bg=BG_MAIN, highlightthickness=0, bd=0)
         title_section.grid(row=0, column=1, sticky="nsew")
         title_section.grid_rowconfigure(0, weight=0)
@@ -1187,9 +1180,7 @@ class GameLedgerApp(ctk.CTk):
         ).grid(row=1, column=0, sticky="nw")
 
         btn_row = tk.Frame(title_section, bg=BG_MAIN, highlightthickness=0, bd=0)
-        btn_row.grid(
-            row=3, column=0, sticky="sw", pady=(15, 0)
-        )  # Added padding to separate from the metadata
+        btn_row.grid(row=3, column=0, sticky="sw", pady=(15, 0))
 
         self.dots_menu = tk.Frame(
             details_inner, bg=BG_HOVER, highlightbackground=FG_DIM, highlightthickness=1
@@ -1236,10 +1227,11 @@ class GameLedgerApp(ctk.CTk):
                 self.resume_menu.place(x=x, y=y)
                 self.resume_menu.lift()
 
-        if game.status == "Completed":
+        if game.status in ("Completed", "Abandoned"):
+            btn_txt = "✓ Completed v" if game.status == "Completed" else "X Abandoned v"
             comp_btn = ctk.CTkButton(
                 btn_row,
-                text="✓ Completed v",
+                text=btn_txt,
                 fg_color="transparent",
                 border_width=2,
                 cursor="hand2",
@@ -1275,10 +1267,22 @@ class GameLedgerApp(ctk.CTk):
                 fg_color="transparent",
                 border_width=2,
                 cursor="hand2",
-                command=lambda: self.transition_to(
-                    self.build_rating_review_screen, game
+                command=lambda e=None: self.transition_to(
+                    self.build_review_screen, game, "Completed"
                 ),
             ).pack(side="left", padx=2)
+
+            def prompt_standalone_abandon():
+                self._show_modal_popup(
+                    "Are you sure you want to abandon this game?",
+                    None,
+                    lambda: self.transition_to(
+                        self.build_review_screen, game, "Abandoned"
+                    ),
+                    "Abandon",
+                    "Cancel",
+                )
+
             ctk.CTkButton(
                 btn_row,
                 text="X",
@@ -1286,6 +1290,7 @@ class GameLedgerApp(ctk.CTk):
                 fg_color="transparent",
                 border_width=2,
                 cursor="hand2",
+                command=prompt_standalone_abandon,
             ).pack(side="left", padx=2)
 
         dots_btn = ctk.CTkButton(
@@ -1332,9 +1337,15 @@ class GameLedgerApp(ctk.CTk):
                 )
 
         wipe_state = (
-            "normal" if (has_sessions or game.status == "Completed") else "disabled"
+            "normal"
+            if (has_sessions or game.status in ("Completed", "Abandoned"))
+            else "disabled"
         )
-        wipe_color = FG_TEXT if (has_sessions or game.status == "Completed") else FG_DIM
+        wipe_color = (
+            FG_TEXT
+            if (has_sessions or game.status in ("Completed", "Abandoned"))
+            else FG_DIM
+        )
 
         ctk.CTkButton(
             self.dots_menu,
@@ -1360,9 +1371,6 @@ class GameLedgerApp(ctk.CTk):
             command=prompt_wipe,
         ).pack(fill="x", pady=(1, 2), padx=2)
 
-        # ---------------------------------------------
-        # MIDDLE ROW: Description + Full Details
-        # ---------------------------------------------
         mid_section = tk.Frame(details_inner, bg=BG_MAIN, highlightthickness=0, bd=0)
         mid_section.pack(fill="x", pady=(10, 20), padx=16)
         mid_section.grid_columnconfigure(0, weight=1)
@@ -1409,9 +1417,6 @@ class GameLedgerApp(ctk.CTk):
                 anchor="w",
             ).grid(row=r + 1, column=c, sticky="w", padx=(0, 18), pady=(0, 12))
 
-        # ---------------------------------------------
-        # BOTTOM ROW: PROGRESS
-        # ---------------------------------------------
         progress_section = tk.Frame(
             details_inner, bg=BG_MAIN, highlightthickness=0, bd=0
         )
@@ -1445,8 +1450,12 @@ class GameLedgerApp(ctk.CTk):
             left_f = tk.Frame(main_row, bg=BG_MAIN)
             left_f.pack(side="left", padx=(10, 0))
 
-            dot_col = TIMER_PLAY_GREEN if review_obj else "#2563EB"
-            # Extract just the Date from the exact timestamp for UI cleanliness
+            status_text = "Completed" if game.status == "Completed" else "Abandoned"
+            status_color = (
+                TIMER_PLAY_GREEN if game.status == "Completed" else TIMER_STOP_RED
+            )
+
+            dot_col = status_color if review_obj else "#2563EB"
             raw_date = session_obj.date if session_obj else review_obj.date
             clean_date = (
                 raw_date.split(" - ")[0]
@@ -1500,7 +1509,6 @@ class GameLedgerApp(ctk.CTk):
                 if review_obj:
                     self.review_service.review_repo.delete_review(review_obj.id)
 
-                # Check actual DB state AFTER deletion to set the correct fallback status
                 remaining_sessions = len(
                     self.session_service.get_sessions_for_game(game.id)
                 )
@@ -1509,9 +1517,8 @@ class GameLedgerApp(ctk.CTk):
                     is not None
                 )
 
-                # Safely cascade the status
                 if has_review_now:
-                    new_status = "Completed"
+                    new_status = game.status
                 elif remaining_sessions > 0:
                     new_status = "In Progress"
                 else:
@@ -1544,8 +1551,8 @@ class GameLedgerApp(ctk.CTk):
                 status_f.pack(side="left")
                 tk.Label(
                     status_f,
-                    text="Completed",
-                    fg=TIMER_PLAY_GREEN,
+                    text=status_text,
+                    fg=status_color,
                     bg=BG_MAIN,
                     font=("Segoe UI", 11),
                 ).pack(side="left", anchor="s", padx=(0, 10))
@@ -1607,7 +1614,6 @@ class GameLedgerApp(ctk.CTk):
 
             state = {"expanded": False}
 
-            # PERFECT FIX: Force color cascade to the text widgets inside the timer and status frames
             def set_bg(color):
                 main_row.configure(fg_color=color)
                 left_f.configure(bg=color)
@@ -1697,26 +1703,19 @@ class GameLedgerApp(ctk.CTk):
 
                 bind_click(main_row)
 
-        # SEPARATE vs UNIFIED MERGE LOGIC:
-        # Only merge them if their timestamps match EXACTLY AND the review was explicitly chained to this session in memory
         sessions_to_render = sessions.copy()
         if review:
-            # We check if the most recent session shares the exact date string.
-            # To prevent accidental merging of a standalone review submitted in the same minute as a session,
-            # we also verify that this session was actually attached to the review payload during submission.
             if sessions_to_render and sessions_to_render[0].date == review.date:
-                # Merge into one row!
                 build_unified_row(
                     session_obj=sessions_to_render.pop(0), review_obj=review
                 )
             else:
-                # Render separate review row
                 build_unified_row(session_obj=None, review_obj=review)
 
         for session in sessions_to_render:
             build_unified_row(session_obj=session, review_obj=None)
 
-        if game.status != "Completed":
+        if game.status not in ("Completed", "Abandoned"):
             ctk.CTkButton(
                 progress_section,
                 text="+ New Session",
@@ -1772,7 +1771,7 @@ class GameLedgerApp(ctk.CTk):
         self.render_recently_played()
 
     # ==========================================
-    #       SCREEN 4: STOPWATCH TIMER (B6-B10)
+    #       SCREEN 4: STOPWATCH TIMER
     # ==========================================
     def _ensure_timer_masters(self):
         """Pre-renders high-resolution master sprites ONCE for silky anti-aliased dynamic scaling."""
@@ -2521,7 +2520,7 @@ class GameLedgerApp(ctk.CTk):
         )
 
     # ==========================================
-    #    SUBMISSION SCREEN (B11-B17)
+    #            SUBMISSION SCREEN
     # ==========================================
     def build_session_submission_screen(
         self,
@@ -2546,7 +2545,6 @@ class GameLedgerApp(ctk.CTk):
         container = tk.Frame(main_bg, bg=BG_MAIN, highlightthickness=0, bd=0)
         container.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.90)
 
-        # Dynamic Fonts - Base sizes reduced so they don't crush the minimized 1000x650 window
         self._sub_f_title = ctk.CTkFont(family="Segoe UI", size=14)
         self._sub_f_game = ctk.CTkFont(family="Segoe UI", size=20, weight="bold")
         self._sub_f_time = ctk.CTkFont(family="Segoe UI", size=48, weight="bold")
@@ -2556,7 +2554,6 @@ class GameLedgerApp(ctk.CTk):
 
         header = tk.Frame(container, bg=BG_MAIN)
         header.pack(fill="x", pady=(0, 40))
-        # Enforce exact 33.3% columns so nothing bleeds over
         header.grid_columnconfigure((0, 1, 2), weight=1, uniform="col")
 
         tk.Label(
@@ -2596,7 +2593,6 @@ class GameLedgerApp(ctk.CTk):
             else datetime.now().strftime("%B %d, %Y %I:%M %p")
         )
 
-        # Split the date and time to stack them vertically
         date_frame = tk.Frame(header, bg=BG_MAIN)
         date_frame.grid(row=1, column=2, pady=(15, 0))
         date_parts = today_str.rsplit(" ", 2)
@@ -2697,8 +2693,9 @@ class GameLedgerApp(ctk.CTk):
         btn_x.pack(side="left", padx=(0, 16))
 
         self._mark_completed_toggled = mark_completed_active
+        self._mark_abandoned_toggled = False
 
-        def update_chk_btn():
+        def update_toggle_btns():
             if self._mark_completed_toggled:
                 btn_chk.configure(
                     fg_color=TIMER_PLAY_GREEN, hover_color=TIMER_PLAY_GREEN_HOVER
@@ -2706,31 +2703,67 @@ class GameLedgerApp(ctk.CTk):
             else:
                 btn_chk.configure(fg_color="transparent", hover_color=BG_SELECTED)
 
-        def toggle_chk():
+            if self._mark_abandoned_toggled:
+                btn_x.configure(
+                    fg_color=TIMER_STOP_RED, hover_color=TIMER_STOP_RED_HOVER
+                )
+            else:
+                btn_x.configure(fg_color="transparent", hover_color=BG_SELECTED)
+
+        def toggle_chk(event=None):
             self._mark_completed_toggled = not self._mark_completed_toggled
-            update_chk_btn()
+            if self._mark_completed_toggled:
+                self._mark_abandoned_toggled = False
+            update_toggle_btns()
+
+        def toggle_x(event=None):
+            self._mark_abandoned_toggled = not self._mark_abandoned_toggled
+            if self._mark_abandoned_toggled:
+                self._mark_completed_toggled = False
+            update_toggle_btns()
 
         btn_chk.configure(command=toggle_chk)
-        update_chk_btn()
+        btn_x.configure(command=toggle_x)
+        update_toggle_btns()
 
         def do_submit(event=None):
             subj = subject_entry.get().strip()
             notes = notes_text.get("1.0", "end").strip()
 
-            # PREVENT DUPLICATES: If returning from the Review screen via "Cancel", update the existing record
-            if existing_session:
-                existing_session.subject = subj
-                existing_session.notes = notes
-                self.session_service.edit_play_session(existing_session)
-                saved_session = existing_session
-            else:
-                saved_session = self.session_service.log_play_session(
-                    game.id, today_str, recorded_seconds, subj, notes
-                )
+            is_deferred_new = getattr(existing_session, "is_deferred_new", False)
+            is_truly_existing = existing_session and not is_deferred_new
 
-            if self._mark_completed_toggled:
-                self.transition_to(self.build_rating_review_screen, game, saved_session)
+            if self._mark_completed_toggled or self._mark_abandoned_toggled:
+                from domain.session import PlaySession
+
+                if is_truly_existing:
+                    existing_session.subject = subj
+                    existing_session.notes = notes
+                    mem_session = existing_session
+                else:
+                    mem_session = PlaySession(
+                        id=0,
+                        game_id=game.id,
+                        date=today_str,
+                        duration_hours=recorded_seconds / 3600.0,
+                        duration_seconds=recorded_seconds,
+                        subject=subj,
+                        notes=notes,
+                    )
+                    mem_session.is_deferred_new = True
+
+                target = "Completed" if self._mark_completed_toggled else "Abandoned"
+                self.transition_to(self.build_review_screen, game, target, mem_session)
             else:
+                if is_truly_existing:
+                    existing_session.subject = subj
+                    existing_session.notes = notes
+                    self.session_service.edit_play_session(existing_session)
+                else:
+                    self.session_service.log_play_session(
+                        game.id, today_str, recorded_seconds, subj, notes
+                    )
+
                 self._scroll_to_bottom_pending = True
                 fresh_game = self.service.game_repo.get_game(game.id)
                 self.transition_to(self.build_main_hub, fresh_game)
@@ -2773,7 +2806,6 @@ class GameLedgerApp(ctk.CTk):
         )
         btn_cancel.pack(side="left")
 
-        # Dynamic Resizing Logic
         self._sub_resize_job = None
         self._sub_pending_stage = None
 
@@ -2792,7 +2824,6 @@ class GameLedgerApp(ctk.CTk):
             self._sub_f_input.configure(size=int(14 * scale))
             self._sub_f_btn.configure(size=int(15 * scale))
 
-            # Secure wrap length perfectly bounds the text within its exact 33% column!
             sub_lbl_game.configure(
                 wraplength=max(150, int(container.winfo_width() / 3.2))
             )
@@ -2811,7 +2842,7 @@ class GameLedgerApp(ctk.CTk):
 
         main_bg.bind("<Configure>", _on_sub_configure)
 
-    def build_rating_review_screen(self, game, pending_session=None):
+    def build_review_screen(self, game, target_status: str, pending_session=None):
         self._cancel_hover_overlay()
         self._active_scroll_canvas = None
         self._details_sync_fn = None
@@ -2831,6 +2862,15 @@ class GameLedgerApp(ctk.CTk):
         self._rev_f_status = ctk.CTkFont(family="Segoe UI", size=28, weight="bold")
         self._rev_f_btn = ctk.CTkFont(family="Segoe UI", size=16, weight="bold")
 
+        status_color = (
+            TIMER_PLAY_GREEN if target_status == "Completed" else TIMER_STOP_RED
+        )
+        status_color_hover = (
+            TIMER_PLAY_GREEN_HOVER
+            if target_status == "Completed"
+            else TIMER_STOP_RED_HOVER
+        )
+
         tk.Label(
             container, text="Game", fg=FG_DIM, bg=BG_MAIN, font=self._rev_f_title
         ).pack(anchor="w", pady=(0, 2))
@@ -2849,7 +2889,11 @@ class GameLedgerApp(ctk.CTk):
             container, text="Status", fg=FG_DIM, bg=BG_MAIN, font=self._rev_f_title
         ).pack(anchor="w", pady=(0, 2))
         tk.Label(
-            container, text="Completed", fg=FG_TEXT, bg=BG_MAIN, font=self._rev_f_status
+            container,
+            text=target_status,
+            fg=status_color,
+            bg=BG_MAIN,
+            font=self._rev_f_status,
         ).pack(anchor="w", pady=(0, 15))
 
         tk.Label(
@@ -2940,9 +2984,9 @@ class GameLedgerApp(ctk.CTk):
             if has_rating or has_text:
                 post_btn.configure(
                     state="normal",
-                    fg_color="#8CC152",
+                    fg_color=status_color,
                     text_color="white",
-                    hover_color="#74A040",
+                    hover_color=status_color_hover,
                 )
             else:
                 post_btn.configure(
@@ -2958,21 +3002,36 @@ class GameLedgerApp(ctk.CTk):
             else datetime.now().strftime("%B %d, %Y %I:%M:%S %p")
         )
 
+        def _execute_save(rating, text):
+            if pending_session:
+                is_deferred_new = getattr(pending_session, "is_deferred_new", False)
+                if is_deferred_new:
+                    self.session_service.log_play_session(
+                        pending_session.game_id,
+                        pending_session.date,
+                        pending_session.duration_seconds,
+                        pending_session.subject,
+                        pending_session.notes,
+                    )
+                else:
+                    self.session_service.edit_play_session(pending_session)
+
+            if target_status == "Completed":
+                self.review_service.mark_game_completed(
+                    game.id, exact_time_str, rating, text, pending_session
+                )
+            else:
+                self.review_service.mark_game_abandoned(
+                    game.id, exact_time_str, rating, text, pending_session
+                )
+
         def _do_post(event=None):
-            self.review_service.mark_game_completed(
-                game.id,
-                exact_time_str,
-                star_widget.value,
-                review_box.get("1.0", "end-1c").strip(),
-                pending_session,
-            )
+            _execute_save(star_widget.value, review_box.get("1.0", "end-1c").strip())
             fresh_game = self.service.game_repo.get_game(game.id)
             self.transition_to(self.build_main_hub, fresh_game)
 
         def _do_skip(event=None):
-            self.review_service.mark_game_completed(
-                game.id, exact_time_str, None, None, pending_session
-            )
+            _execute_save(None, None)
             fresh_game = self.service.game_repo.get_game(game.id)
             self.transition_to(self.build_main_hub, fresh_game)
 
@@ -2983,7 +3042,7 @@ class GameLedgerApp(ctk.CTk):
                     game,
                     pending_session.duration_seconds,
                     pending_session,
-                    True,
+                    (target_status == "Completed"),
                     pending_session.date,
                 )
             else:
@@ -2991,7 +3050,7 @@ class GameLedgerApp(ctk.CTk):
 
         post_btn.configure(
             command=lambda e=None: self._show_modal_popup(
-                "Post Review?", None, _do_post
+                "Submit Review?", None, _do_post
             )
         )
         skip_btn.configure(
@@ -3002,7 +3061,7 @@ class GameLedgerApp(ctk.CTk):
         cancel_btn.configure(command=lambda e=None: _do_cancel())
 
     # ==========================================
-    #      SESSION EDIT SCREEN (D6-D10)
+    #           SESSION EDIT SCREEN
     # ==========================================
     def build_session_edit_screen(self, game, session):
         self._cancel_hover_overlay()
@@ -3305,22 +3364,25 @@ class GameLedgerApp(ctk.CTk):
 
         main_bg.bind("<Configure>", _on_edit_configure)
 
-    def _show_modal_popup(self, text, subtext, on_yes):
-        # Anchor overlay directly to 'self' (root window) to guarantee dead-center placement
+    def _show_modal_popup(self, text, subtext, on_yes, yes_text="Yes", no_text="No"):
         overlay = tk.Frame(
             self, bg=BG_MAIN, highlightbackground=FG_DIM, highlightthickness=2
         )
         overlay.place(relx=0.5, rely=0.5, anchor="center", width=420, height=200)
 
-        # Natively routes all events to this popup, perfectly blocking clicks behind it
         overlay.grab_set()
 
         tk.Label(
-            overlay, text=text, fg=FG_TEXT, bg=BG_MAIN, font=("Segoe UI", 20)
+            overlay,
+            text=text,
+            fg=FG_TEXT,
+            bg=BG_MAIN,
+            font=("Segoe UI", 16),
+            wraplength=380,
+            justify="center",
         ).pack(pady=(25, 5))
 
         if subtext:
-            # ADDED: wraplength=380 and justify="center" prevents any visual text cutoffs
             tk.Label(
                 overlay,
                 text=subtext,
@@ -3331,43 +3393,45 @@ class GameLedgerApp(ctk.CTk):
                 justify="center",
             ).pack(pady=(0, 20))
         else:
-            tk.Frame(overlay, bg=BG_MAIN, height=20).pack(pady=(0, 20))  # spacer
+            tk.Frame(overlay, bg=BG_MAIN, height=20).pack(pady=(0, 20))
 
         btn_row = tk.Frame(overlay, bg=BG_MAIN)
         btn_row.pack()
 
-        def yes_click():
+        def yes_click(event=None):
             overlay.grab_release()
             overlay.destroy()
             on_yes()
 
-        def no_click():
+        def no_click(event=None):
             overlay.grab_release()
             overlay.destroy()
 
         ctk.CTkButton(
             btn_row,
-            text="Yes",
+            text=yes_text,
             width=80,
             height=36,
-            fg_color=TIMER_PLAY_GREEN,
-            hover_color=TIMER_PLAY_GREEN_HOVER,
+            fg_color=TIMER_PLAY_GREEN if yes_text != "Abandon" else TIMER_STOP_RED,
+            hover_color=TIMER_PLAY_GREEN_HOVER
+            if yes_text != "Abandon"
+            else TIMER_STOP_RED_HOVER,
             cursor="hand2",
             command=yes_click,
         ).pack(side="left", padx=10)
         ctk.CTkButton(
             btn_row,
-            text="No",
+            text=no_text,
             width=80,
             height=36,
-            fg_color=TIMER_STOP_RED,
-            hover_color=TIMER_STOP_RED_HOVER,
+            fg_color=TIMER_STOP_RED if no_text == "No" else "#737373",
+            hover_color=TIMER_STOP_RED_HOVER if no_text == "No" else "#525252",
             cursor="hand2",
             command=no_click,
         ).pack(side="left", padx=10)
 
     # ==========================================
-    #             SCREEN 2: ADDING GAME
+    #         SCREEN 2: ADDING GAME
     # ==========================================
     def build_adding_game_screen(self):
         self._active_scroll_canvas = None
@@ -3715,7 +3779,7 @@ class GameLedgerApp(ctk.CTk):
         ).grid(row=1, column=0, columnspan=3, pady=40)
 
     # ==========================================
-    #             POPUP 4: SELECT VERSION
+    #          POPUP 4: SELECT VERSION
     # ==========================================
     def open_platform_popup(self, game_dict):
         dialog = ctk.CTkToplevel(self)
