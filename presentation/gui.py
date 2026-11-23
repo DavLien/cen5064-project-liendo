@@ -1112,9 +1112,7 @@ class GameLedgerApp(ctk.CTk):
         sessions = self.session_service.get_sessions_for_game(game.id)
         has_sessions = len(sessions) > 0
 
-        review = None
-        if game.status in ("Completed", "Abandoned"):
-            review = self.review_service.review_repo.get_review_for_game(game.id)
+        review = self.review_service.review_repo.get_review_for_game(game.id)
 
         def start_new_session(g=game):
             self.after(10, self.transition_to, self.build_timer_screen, g)
@@ -1227,6 +1225,13 @@ class GameLedgerApp(ctk.CTk):
                 self.resume_menu.place(x=x, y=y)
                 self.resume_menu.lift()
 
+        def _do_resume():
+            close_menus()
+            self.review_service.resume_game(game.id)
+            fresh_game = self.service.game_repo.get_game(game.id)
+            self.render_sidebar()
+            self.render_inline_game_details(fresh_game)
+
         if game.status in ("Completed", "Abandoned"):
             btn_txt = "✓ Completed v" if game.status == "Completed" else "X Abandoned v"
             comp_btn = ctk.CTkButton(
@@ -1248,7 +1253,7 @@ class GameLedgerApp(ctk.CTk):
                 corner_radius=0,
                 width=245,
                 anchor="w",
-                command=close_menus,
+                command=_do_resume,
             ).pack(fill="x", pady=(2, 2), padx=2)
         else:
             ctk.CTkButton(
@@ -1450,10 +1455,22 @@ class GameLedgerApp(ctk.CTk):
             left_f = tk.Frame(main_row, bg=BG_MAIN)
             left_f.pack(side="left", padx=(10, 0))
 
-            status_text = "Completed" if game.status == "Completed" else "Abandoned"
-            status_color = (
-                TIMER_PLAY_GREEN if game.status == "Completed" else TIMER_STOP_RED
-            )
+            if game.status == "Completed":
+                status_text = "Completed"
+                status_color = TIMER_PLAY_GREEN
+            elif game.status == "Abandoned":
+                status_text = "Abandoned"
+                status_color = TIMER_STOP_RED
+            else:
+                # The game is resumed ("In Progress"). We infer its historical status
+                # based on whether the review has a star rating attached.
+                is_historical_completion = bool(
+                    review_obj and review_obj.rating is not None
+                )
+                status_text = "Completed" if is_historical_completion else "Abandoned"
+                status_color = (
+                    TIMER_PLAY_GREEN if is_historical_completion else TIMER_STOP_RED
+                )
 
             dot_col = status_color if review_obj else "#2563EB"
             raw_date = session_obj.date if session_obj else review_obj.date
