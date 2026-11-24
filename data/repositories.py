@@ -285,78 +285,71 @@ class SqliteSessionRepository(SessionRepository):
 
 
 class SqliteReviewRepository(ReviewRepository):
-    """Manages saving and loading game reviews and ratings."""
-
-    def __init__(self, db_path: str = "data/gameledger.db"):
+    def __init__(self, db_path: str = "gameledger.db"):
         self.db_path = db_path
-        self._initialize_database()
+        self._ensure_table()
 
-    def _initialize_database(self):
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS reviews (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    game_id INTEGER UNIQUE NOT NULL,
-                    date TEXT NOT NULL,
-                    rating REAL,
-                    review_text TEXT,
-                    abandoned_reason TEXT,
-                    FOREIGN KEY(game_id) REFERENCES games(id) ON DELETE CASCADE
+    def _connect(self):
+        return sqlite3.connect(self.db_path)
+
+    def _ensure_table(self):
+        with self._connect() as conn:
+            # We create a v2 table without the UNIQUE(game_id) constraint to allow multiple reviews
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS game_reviews_v2 ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "game_id INTEGER NOT NULL, "
+                "date TEXT NOT NULL, "
+                "rating REAL, "
+                "review_text TEXT, "
+                "status_type TEXT NOT NULL DEFAULT 'Completed')"
+            )
+            # Silently migrate old reviews over, then drop the old restricted table
+            try:
+                conn.execute(
+                    "INSERT INTO game_reviews_v2 (id, game_id, date, rating, review_text, status_type) SELECT id, game_id, date, rating, review_text, 'Completed' FROM reviews"
                 )
-            """)
-            # Auto-migrate if table exists without date
-            cursor.execute("PRAGMA table_info(reviews)")
-            if "date" not in [row[1] for row in cursor.fetchall()]:
-                conn.execute("ALTER TABLE reviews ADD COLUMN date TEXT DEFAULT ''")
-            conn.commit()
+                conn.execute("DROP TABLE reviews")
+            except sqlite3.OperationalError:
+                pass
 
     def save_review(self, review: GameReview) -> GameReview:
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                INSERT OR REPLACE INTO reviews (game_id, date, rating, review_text, abandoned_reason)
-                VALUES (?, ?, ?, ?, ?)
-            """,
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "INSERT INTO game_reviews_v2 (game_id, date, rating, review_text, status_type) VALUES (?, ?, ?, ?, ?)",
                 (
                     review.game_id,
                     review.date,
                     review.rating,
                     review.review_text,
-                    review.abandoned_reason,
+                    review.status_type,
                 ),
             )
-            conn.commit()
             review.id = cursor.lastrowid
-        return review
+            return review
 
     def get_review_for_game(self, game_id: int) -> GameReview | None:
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT id, game_id, date, rating, review_text, abandoned_reason 
-                FROM reviews 
-                WHERE game_id = ?
-            """,
+        reviews = self.get_reviews_for_game(game_id)
+        return reviews[0] if reviews else None
+
+    def get_reviews_for_game(self, game_id: int) -> list[GameReview]:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "SELECT id, game_id, date, rating, review_text, status_type FROM game_reviews_v2 WHERE game_id = ? ORDER BY id DESC",
                 (game_id,),
             )
-            row = cursor.fetchone()
-
-            if row:
-                return GameReview(
-                    id=row[0],
-                    game_id=row[1],
-                    date=row[2],
-                    rating=row[3],
-                    review_text=row[4],
-                    abandoned_reason=row[5],
+            return [
+                GameReview(
+                    id=r[0],
+                    game_id=r[1],
+                    date=r[2],
+                    rating=r[3],
+                    review_text=r[4],
+                    status_type=r[5],
                 )
-            return None
+                for r in cursor.fetchall()
+            ]
 
     def delete_review(self, review_id: int) -> None:
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM reviews WHERE id = ?", (review_id,))
-            conn.commit()
+        with self._connect() as conn:
+            conn.execute("DELETE FROM game_reviews_v2 WHERE id = ?", (review_id,))
