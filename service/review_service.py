@@ -72,9 +72,23 @@ class ReviewService:
             date=final_date,
             rating=rating if rating and rating > 0.0 else None,
             review_text=review_text.strip() if has_text else None,
+            status_type=target_status,
         )
         self.review_repo.save_review(review)
 
         game.status = target_status
         game.total_hours = round(game.total_hours, 2)
+        self.game_repo.update_game(game)
+
+    def resume_game(self, game_id: int) -> None:
+        game = self.game_repo.get_game(game_id)
+        if not game:
+            raise ValueError(f"Game with ID {game_id} not found.")
+
+        if game.status not in ("Completed", "Abandoned"):
+            raise ValueError(
+                f"Cannot resume game. Current status is '{game.status}'. Must be 'Completed' or 'Abandoned'."
+            )
+
+        game.status = "In Progress"
         self.game_repo.update_game(game)

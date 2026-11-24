@@ -103,3 +103,60 @@ class TestReviewService(unittest.TestCase):
         # Assert
         saved_review = self.mock_review_repo.save_review.call_args[0][0]
         self.assertIsNone(saved_review.rating)
+
+    def test_resume_game_from_completed(self):
+        mock_game = Game(
+            id=1,
+            title="Test",
+            platform="PC",
+            game_modes=["Single-Player"],
+            status="Completed",
+            total_hours=10.0,
+        )
+        self.mock_game_repo.get_game.return_value = mock_game
+
+        self.service.resume_game(1)
+
+        self.assertEqual(mock_game.status, "In Progress")
+        self.mock_game_repo.update_game.assert_called_once_with(mock_game)
+        self.mock_review_repo.delete_review.assert_not_called()
+
+    def test_resume_game_from_abandoned(self):
+        mock_game = Game(
+            id=2,
+            title="Test 2",
+            platform="PC",
+            game_modes=["Single-Player"],
+            status="Abandoned",
+            total_hours=5.0,
+        )
+        self.mock_game_repo.get_game.return_value = mock_game
+
+        self.service.resume_game(2)
+
+        self.assertEqual(mock_game.status, "In Progress")
+        self.mock_game_repo.update_game.assert_called_once_with(mock_game)
+        self.mock_review_repo.delete_review.assert_not_called()
+
+    def test_resume_game_invalid_status(self):
+        mock_game = Game(
+            id=3,
+            title="Test 3",
+            platform="PC",
+            game_modes=["Single-Player"],
+            status="In Progress",
+            total_hours=2.0,
+        )
+        self.mock_game_repo.get_game.return_value = mock_game
+
+        with self.assertRaises(ValueError):
+            self.service.resume_game(3)
+
+    def test_resume_game_not_found(self):
+        self.mock_game_repo.get_game.return_value = None
+
+        with self.assertRaises(ValueError) as context:
+            self.service.resume_game(999)
+
+        self.assertTrue("not found" in str(context.exception))
+        self.mock_game_repo.update_game.assert_not_called()

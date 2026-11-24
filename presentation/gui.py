@@ -1112,9 +1112,8 @@ class GameLedgerApp(ctk.CTk):
         sessions = self.session_service.get_sessions_for_game(game.id)
         has_sessions = len(sessions) > 0
 
-        review = None
-        if game.status in ("Completed", "Abandoned"):
-            review = self.review_service.review_repo.get_review_for_game(game.id)
+        # Always fetch so historical reviews remain visible when the game is resumed
+        reviews = self.review_service.review_repo.get_reviews_for_game(game.id)
 
         def start_new_session(g=game):
             self.after(10, self.transition_to, self.build_timer_screen, g)
@@ -1159,11 +1158,12 @@ class GameLedgerApp(ctk.CTk):
         )
         self.title_text.insert("1.0", game.title + "  ")
 
-        if review and review.rating is not None:
+        latest_review = reviews[0] if reviews else None
+        if latest_review and latest_review.rating is not None:
             self.star_canvas = StarRatingWidget(
                 self.title_text, interactive=False, size=24
             )
-            self.star_canvas.set_value(review.rating)
+            self.star_canvas.set_value(latest_review.rating)
             self.title_text.window_create("end", window=self.star_canvas, pady=4)
 
         self.title_text.configure(state="disabled")
@@ -1183,10 +1183,16 @@ class GameLedgerApp(ctk.CTk):
         btn_row.grid(row=3, column=0, sticky="sw", pady=(15, 0))
 
         self.dots_menu = tk.Frame(
-            details_inner, bg=BG_HOVER, highlightbackground=FG_DIM, highlightthickness=1
+            self.main_view,
+            bg=BG_HOVER,
+            highlightbackground=FG_DIM,
+            highlightthickness=1,
         )
         self.resume_menu = tk.Frame(
-            details_inner, bg=BG_HOVER, highlightbackground=FG_DIM, highlightthickness=1
+            self.main_view,
+            bg=BG_HOVER,
+            highlightbackground=FG_DIM,
+            highlightthickness=1,
         )
 
         def close_menus():
@@ -1200,14 +1206,12 @@ class GameLedgerApp(ctk.CTk):
             close_menus()
             if not is_open:
                 self.update_idletasks()
-                scale = dots_btn._get_widget_scaling()
-                x = (btn_row.winfo_rootx() - details_inner.winfo_rootx()) / scale
+                x = dots_btn.winfo_rootx() - self.main_view.winfo_rootx()
                 y = (
-                    btn_row.winfo_rooty()
-                    - details_inner.winfo_rooty()
-                    + btn_row.winfo_height()
-                    + 6
-                ) / scale
+                    (dots_btn.winfo_rooty() - self.main_view.winfo_rooty())
+                    + dots_btn.winfo_height()
+                    + 4
+                )
                 self.dots_menu.place(x=x, y=y)
                 self.dots_menu.lift()
 
@@ -1216,16 +1220,21 @@ class GameLedgerApp(ctk.CTk):
             close_menus()
             if not is_open:
                 self.update_idletasks()
-                scale = comp_btn._get_widget_scaling()
-                x = (btn_row.winfo_rootx() - details_inner.winfo_rootx()) / scale
+                x = comp_btn.winfo_rootx() - self.main_view.winfo_rootx()
                 y = (
-                    btn_row.winfo_rooty()
-                    - details_inner.winfo_rooty()
-                    + btn_row.winfo_height()
-                    + 6
-                ) / scale
+                    (comp_btn.winfo_rooty() - self.main_view.winfo_rooty())
+                    + comp_btn.winfo_height()
+                    + 4
+                )
                 self.resume_menu.place(x=x, y=y)
                 self.resume_menu.lift()
+
+        def _do_resume():
+            close_menus()
+            self.review_service.resume_game(game.id)
+            fresh_game = self.service.game_repo.get_game(game.id)
+            self.render_sidebar()
+            self.render_inline_game_details(fresh_game)
 
         if game.status in ("Completed", "Abandoned"):
             btn_txt = "✓ Completed v" if game.status == "Completed" else "X Abandoned v"
@@ -1248,7 +1257,7 @@ class GameLedgerApp(ctk.CTk):
                 corner_radius=0,
                 width=245,
                 anchor="w",
-                command=close_menus,
+                command=_do_resume,
             ).pack(fill="x", pady=(2, 2), padx=2)
         else:
             ctk.CTkButton(
@@ -1306,8 +1315,9 @@ class GameLedgerApp(ctk.CTk):
 
         def do_wipe():
             self.session_service.delete_all_sessions_for_game(game.id)
-            if review:
-                self.review_service.review_repo.delete_review(review.id)
+            if reviews:
+                for r in reviews:
+                    self.review_service.review_repo.delete_review(r.id)
             self.service.update_game_status(game.id, "Backlog")
             fresh_game = self.service.game_repo.get_game(game.id)
             self.render_sidebar()
@@ -1450,10 +1460,19 @@ class GameLedgerApp(ctk.CTk):
             left_f = tk.Frame(main_row, bg=BG_MAIN)
             left_f.pack(side="left", padx=(10, 0))
 
-            status_text = "Completed" if game.status == "Completed" else "Abandoned"
-            status_color = (
-                TIMER_PLAY_GREEN if game.status == "Completed" else TIMER_STOP_RED
-            )
+            if review_obj and hasattr(review_obj, "status_type"):
+                status_text = review_obj.status_type
+                status_color = (
+                    TIMER_PLAY_GREEN if status_text == "Completed" else TIMER_STOP_RED
+                )
+            else:
+                is_historical_completion = bool(
+                    review_obj and review_obj.rating is not None
+                )
+                status_text = "Completed" if is_historical_completion else "Abandoned"
+                status_color = (
+                    TIMER_PLAY_GREEN if is_historical_completion else TIMER_STOP_RED
+                )
 
             dot_col = status_color if review_obj else "#2563EB"
             raw_date = session_obj.date if session_obj else review_obj.date
@@ -1504,6 +1523,17 @@ class GameLedgerApp(ctk.CTk):
                 ToolTip(edit_btn, "Edit Session")
 
             def on_delete_row():
+                # 1. Identify if the review being deleted is the PRIORITY (most recent) review
+                is_priority_review = False
+                if (
+                    review_obj
+                    and game.status in ("Completed", "Abandoned")
+                    and reviews
+                    and review_obj.id == reviews[0].id
+                ):
+                    is_priority_review = True
+
+                # 2. Delete the objects from the database
                 if session_obj:
                     self.session_service.delete_play_session(session_obj.id, game.id)
                 if review_obj:
@@ -1512,17 +1542,25 @@ class GameLedgerApp(ctk.CTk):
                 remaining_sessions = len(
                     self.session_service.get_sessions_for_game(game.id)
                 )
-                has_review_now = (
-                    self.review_service.review_repo.get_review_for_game(game.id)
-                    is not None
+                remaining_reviews = (
+                    self.review_service.review_repo.get_reviews_for_game(game.id)
                 )
 
-                if has_review_now:
-                    new_status = game.status
-                elif remaining_sessions > 0:
-                    new_status = "In Progress"
-                else:
+                # 3. Apply status logic ONLY if the priority review was deleted
+                if is_priority_review:
+                    new_status = (
+                        "In Progress"
+                        if (remaining_sessions > 0 or remaining_reviews)
+                        else "Backlog"
+                    )
+                elif (
+                    game.status == "In Progress"
+                    and remaining_sessions == 0
+                    and not remaining_reviews
+                ):
                     new_status = "Backlog"
+                else:
+                    new_status = game.status
 
                 self.service.update_game_status(game.id, new_status)
 
@@ -1703,17 +1741,41 @@ class GameLedgerApp(ctk.CTk):
 
                 bind_click(main_row)
 
-        sessions_to_render = sessions.copy()
-        if review:
-            if sessions_to_render and sessions_to_render[0].date == review.date:
-                build_unified_row(
-                    session_obj=sessions_to_render.pop(0), review_obj=review
-                )
-            else:
-                build_unified_row(session_obj=None, review_obj=review)
+        events_by_date = {}
 
-        for session in sessions_to_render:
-            build_unified_row(session_obj=session, review_obj=None)
+        for r in reviews:
+            if r.date not in events_by_date:
+                events_by_date[r.date] = {"session": None, "review": None}
+            if not events_by_date[r.date]["review"]:
+                events_by_date[r.date]["review"] = r
+
+        for s in sessions:
+            if s.date not in events_by_date:
+                events_by_date[s.date] = {"session": None, "review": None}
+            if events_by_date[s.date]["session"] is None:
+                events_by_date[s.date]["session"] = s
+            else:
+                # If you literally clicked fast enough to create 2 sessions in the exact same minute
+                events_by_date[s.date + f"_{s.id}"] = {"session": s, "review": None}
+
+        def parse_date_for_sort(date_str):
+            try:
+                clean_str = date_str.split("_")[0]
+                if clean_str.count(":") == 2:
+                    return datetime.strptime(clean_str, "%B %d, %Y %I:%M:%S %p")
+                return datetime.strptime(clean_str, "%B %d, %Y %I:%M %p")
+            except ValueError:
+                return datetime.min
+
+        sorted_dates = sorted(
+            events_by_date.keys(), key=parse_date_for_sort, reverse=True
+        )
+
+        for date_key in sorted_dates:
+            build_unified_row(
+                session_obj=events_by_date[date_key]["session"],
+                review_obj=events_by_date[date_key]["review"],
+            )
 
         if game.status not in ("Completed", "Abandoned"):
             ctk.CTkButton(
