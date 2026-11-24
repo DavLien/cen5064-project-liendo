@@ -309,7 +309,7 @@ class GameLedgerApp(ctk.CTk):
         self.platform_colors = {
             "PlayStation 4": "#2563EB",  # Blue
             "PlayStation 5": "white",
-            "Xbox Series X": "#007A33",  # Green
+            "Xbox Series X/S": "#007A33",  # Green
             "PC": "#87CEEB",  # Sky-Blue
             "Nintendo Switch": "#E60012",  # True Red
             "Nintendo Switch 2": "#D2042D",  # Cherry Red
@@ -926,7 +926,7 @@ class GameLedgerApp(ctk.CTk):
         search_frame.grid_columnconfigure(0, weight=1)
         search_frame.grid_columnconfigure(1, weight=0)
 
-        ctk.CTkEntry(search_frame, placeholder_text="Search local...", width=10).grid(
+        ctk.CTkEntry(search_frame, placeholder_text="Search Local...", width=10).grid(
             row=0, column=0, sticky="ew", padx=(0, 6)
         )
         ctk.CTkButton(search_frame, text="≡", width=30, cursor="hand2").grid(
@@ -3600,7 +3600,7 @@ class GameLedgerApp(ctk.CTk):
 
         ctk.CTkLabel(
             self.filter_overlay,
-            text="PLAY STATE",
+            text="GAME MODE",
             font=ctk.CTkFont(size=11, weight="bold"),
             text_color="#00A8E8",
         ).pack(anchor="w", padx=15, pady=(10, 5))
@@ -3614,7 +3614,7 @@ class GameLedgerApp(ctk.CTk):
 
         ctk.CTkCheckBox(
             self.filter_overlay,
-            text="Single player",
+            text="Single-Player",
             variable=self.sp_var,
             onvalue="checked",
             offvalue="unchecked",
@@ -3622,7 +3622,7 @@ class GameLedgerApp(ctk.CTk):
         ).pack(anchor="w", padx=15, pady=5)
         ctk.CTkCheckBox(
             self.filter_overlay,
-            text="Multiplayer",
+            text="Multi-Player",
             variable=self.mp_var,
             onvalue="checked",
             offvalue="unchecked",
@@ -3859,7 +3859,7 @@ class GameLedgerApp(ctk.CTk):
             [
                 "PlayStation 4",
                 "PlayStation 5",
-                "Xbox Series X",
+                "Xbox Series X/S",
                 "PC",
                 "Nintendo Switch",
                 "Nintendo Switch 2",
