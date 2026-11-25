@@ -81,6 +81,7 @@ class SessionService:
 
     def get_total_playtime(self, game_id: int) -> tuple[int, int]:
         sessions = self.session_repo.get_sessions_for_game(game_id)
+        # Aggregates exactly recorded seconds from all valid session/review events
         total_seconds = sum(s.duration_seconds for s in sessions)
         hours = int(total_seconds // 3600)
         minutes = int((total_seconds % 3600) // 60)

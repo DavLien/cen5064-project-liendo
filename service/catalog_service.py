@@ -101,6 +101,7 @@ class CatalogService:
         games.sort(key=lambda g: g.title.lower())
 
         filtered = []
+        # F4: Remove spaces for contiguous matching (e.g., "ho" matches "Breath of the Wild")
         query_clean = search_query.replace(" ", "").lower() if search_query else ""
 
         for g in games:

@@ -298,12 +298,12 @@ class GameLedgerApp(ctk.CTk):
         self.saved_search_query = ""
         self.active_filter = None
 
-        # All libraries default to CLOSED ('>') on startup
+        # All libraries default to OPEN ('v') on startup
         self.category_states = {
-            "Backlog": False,
-            "In Progress": False,
-            "Completed": False,
-            "Abandoned": False,
+            "Backlog": True,
+            "In Progress": True,
+            "Completed": True,
+            "Abandoned": True,
         }
 
         self.platform_colors = {
@@ -312,18 +312,24 @@ class GameLedgerApp(ctk.CTk):
             "Xbox Series X/S": "#007A33",  # Green
             "PC": "#87CEEB",  # Sky-Blue
             "Nintendo Switch": "#E60012",  # True Red
-            "Nintendo Switch 2": "#D2042D",  # Cherry Red
+            "Nintendo Switch 2": "#990000",  # Crimson Red
         }
+
+        self._cover_cache = {}
 
         self.bind("<FocusOut>", self._on_focus_out)
         self.bind("<Configure>", self._on_window_configure)
-        self.bind_all("<MouseWheel>", self._on_details_mousewheel)
 
         self._sidebar_search_var = tk.StringVar(value="")
         self._sidebar_platform_var = tk.StringVar(value="")
         self._sidebar_mode_var = tk.StringVar(value="")
+        self._details_scrollbar = None
 
         self.bind("<Button-1>", self._on_root_click, add="+")
+        self.bind_all("<MouseWheel>", self._on_details_mousewheel)
+        self.bind_all("<Motion>", self._on_global_motion, add="+")
+        # Changed to bind_all so it triggers regardless of which widget your mouse exits from
+        self.bind_all("<Leave>", self._on_global_leave, add="+")
 
         self.build_main_hub()
 
@@ -374,6 +380,16 @@ class GameLedgerApp(ctk.CTk):
         if total_w <= 1 or total_h <= 1:
             return
 
+        # 1. Prevent redundant layout passes if dimensions haven't actually changed
+        if (
+            event is not None
+            and getattr(self, "_last_body_w", -1) == total_w
+            and getattr(self, "_last_body_h", -1) == total_h
+        ):
+            return
+        self._last_body_w = total_w
+        self._last_body_h = total_h
+
         w = self._clamp_sidebar_width(self.sidebar_width, total_w)
         growing = w >= self._last_placed_sidebar_width
         self.sidebar_width = w
@@ -394,7 +410,10 @@ class GameLedgerApp(ctk.CTk):
                 x=w + self.SASH_WIDTH, y=0, width=main_w, height=total_h
             )
 
-        self._update_sidebar_truncation()
+        # 2. Debounce the heavy text measuring so the window resize and drag remain completely fluid
+        if getattr(self, "_truncation_job", None):
+            self.after_cancel(self._truncation_job)
+        self._truncation_job = self.after(20, self._update_sidebar_truncation)
 
         # Sync Game Details canvas/wraplengths in the exact same frame
         if self._details_sync_fn is not None:
@@ -444,8 +463,8 @@ class GameLedgerApp(ctk.CTk):
         try:
             self.sidebar_width = target
             self._layout_split_pane()
-            # Drain <Configure> (CTkEntry/CTkButton/CTkFrame), idle layouts, and WM_PAINT
-            self.update()
+            # RESTORE the GPU flush! Now that the heavy text math is debounced, this guarantees zero visual tearing.
+            self.update_idletasks()
             self._flush_win32_paint()
         finally:
             self._in_sash_update = False
@@ -480,22 +499,103 @@ class GameLedgerApp(ctk.CTk):
             if final_w != self.sidebar_width:
                 self.sidebar_width = final_w
                 self._layout_split_pane()
-                self.update_idletasks()
-                self._flush_win32_paint()
         self._save_sidebar_width()
 
     def _on_details_mousewheel(self, event):
-        canvas = self._active_scroll_canvas
-        if canvas is None or not canvas.winfo_exists():
+        self._cancel_hover_overlay()  # INSTANTLY clears the long title when you scroll (Fixes Issue 3)
+        target_canvas = None
+        if (
+            hasattr(self, "_sidebar_canvas")
+            and self._sidebar_canvas.winfo_exists()
+            and self._is_pointer_inside(self.sidebar_frame)
+        ):
+            target_canvas = self._sidebar_canvas
+        elif (
+            hasattr(self, "_active_scroll_canvas")
+            and self._active_scroll_canvas
+            and self._active_scroll_canvas.winfo_exists()
+            and self._is_pointer_inside(self.main_view)
+        ):
+            target_canvas = self._active_scroll_canvas
+
+        if target_canvas is None or target_canvas.yview() == (0.0, 1.0):
             return
-        if not self._is_pointer_inside(canvas):
+        target_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    def _on_global_motion(self, event):
+        # Explicitly cancel the hover overlay if the mouse has moved into the main view
+        if self._is_pointer_inside(self.main_view):
+            self._cancel_hover_overlay()
+
+        if (
+            hasattr(self, "_sidebar_canvas")
+            and self._sidebar_canvas.winfo_exists()
+            and hasattr(self, "_sidebar_scrollbar")
+            and self._sidebar_scrollbar
+            and self._sidebar_scrollbar.winfo_exists()
+        ):
+            # Removed margin_x keyword argument to match your original function signature
+            if self._is_pointer_inside(
+                self.sidebar_frame
+            ) and self._sidebar_canvas.yview() != (0.0, 1.0):
+                if not self._sidebar_scrollbar.winfo_ismapped():
+                    self._sidebar_scrollbar.grid(
+                        row=1, column=1, sticky="ns", padx=(2, 0)
+                    )
+            else:
+                if self._sidebar_scrollbar.winfo_ismapped():
+                    self._sidebar_scrollbar.grid_remove()
+
+        if (
+            hasattr(self, "_details_scrollbar")
+            and self._details_scrollbar
+            and self._details_scrollbar.winfo_exists()
+            and hasattr(self, "_active_scroll_canvas")
+            and self._active_scroll_canvas
+            and self._active_scroll_canvas.winfo_exists()
+        ):
+            # Removed margin_x keyword argument to match your original function signature
+            if self._is_pointer_inside(
+                self.main_view
+            ) and self._active_scroll_canvas.yview() != (0.0, 1.0):
+                if not self._details_scrollbar.winfo_ismapped():
+                    self._details_scrollbar.place(
+                        relx=1.0, rely=0, relheight=1.0, anchor="ne"
+                    )
+            else:
+                if self._details_scrollbar.winfo_ismapped():
+                    self._details_scrollbar.place_forget()
+
+    def _on_global_leave(self, event):
+        # 1. Get exact global coordinates of the mouse
+        px, py = self.winfo_pointerxy()
+
+        # 2. Get the exact global boundaries of the entire GameLedger window
+        wx = self.winfo_rootx()
+        wy = self.winfo_rooty()
+        ww = self.winfo_width()
+        wh = self.winfo_height()
+
+        # 3. If the mouse is still physically inside the app boundaries, do nothing
+        if wx <= px <= wx + ww and wy <= py <= wy + wh:
             return
-        # Only scroll when content exceeds the visible viewport
-        if canvas.yview() == (0.0, 1.0):
-            return
-        canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        # 4. Mouse has completely left the app. INSTANTLY hide both scrollbars.
+        if (
+            hasattr(self, "_sidebar_scrollbar")
+            and self._sidebar_scrollbar
+            and self._sidebar_scrollbar.winfo_exists()
+        ):
+            self._sidebar_scrollbar.grid_remove()
+        if (
+            hasattr(self, "_details_scrollbar")
+            and self._details_scrollbar
+            and self._details_scrollbar.winfo_exists()
+        ):
+            self._details_scrollbar.place_forget()
 
     def _on_root_click(self, event):
+        # F11: Destroys the filter panel if the user clicks anywhere outside of it
         if (
             hasattr(self, "sidebar_filter_overlay")
             and self.sidebar_filter_overlay.winfo_exists()
@@ -557,19 +657,37 @@ class GameLedgerApp(ctk.CTk):
             ("Nintendo Switch 2", "Nintendo Switch 2"),
         ]
 
-        def on_filter_change():
+        self._platform_checkboxes = []
+        self._mode_checkboxes = []
+
+        def on_platform_change(val):
+            # If the user clicks the currently selected radio button, unselect it.
+            if self._sidebar_platform_var.get() == val:
+                self._sidebar_platform_var.set("")
+            else:
+                self._sidebar_platform_var.set(val)
+
+            # Visually update all checkboxes in this group
+            for cb, cb_val in self._platform_checkboxes:
+                if cb_val == self._sidebar_platform_var.get():
+                    cb.select()
+                else:
+                    cb.deselect()
             self.render_sidebar()
 
         for text_lbl, val in platforms:
             cb = ctk.CTkCheckBox(
                 self.sidebar_filter_overlay,
                 text=text_lbl,
-                variable=self._sidebar_platform_var,
-                onvalue=val,
-                offvalue="",
-                command=on_filter_change,
+                command=lambda v=val: on_platform_change(v),
             )
+            # Initialize visual state based on current variable
+            if self._sidebar_platform_var.get() == val:
+                cb.select()
+            else:
+                cb.deselect()
             cb.pack(anchor="w", padx=15, pady=3)
+            self._platform_checkboxes.append((cb, val))
 
         ctk.CTkLabel(
             self.sidebar_filter_overlay,
@@ -578,22 +696,66 @@ class GameLedgerApp(ctk.CTk):
             text_color="#00A8E8",
         ).pack(anchor="w", padx=15, pady=(10, 5))
 
+        def on_mode_change(val):
+            if self._sidebar_mode_var.get() == val:
+                self._sidebar_mode_var.set("")
+            else:
+                self._sidebar_mode_var.set(val)
+
+            for cb, cb_val in self._mode_checkboxes:
+                if cb_val == self._sidebar_mode_var.get():
+                    cb.select()
+                else:
+                    cb.deselect()
+            self.render_sidebar()
+
         for mode in ["Single-Player", "Multi-Player"]:
             cb = ctk.CTkCheckBox(
                 self.sidebar_filter_overlay,
                 text=mode,
-                variable=self._sidebar_mode_var,
-                onvalue=mode,
-                offvalue="",
-                command=on_filter_change,
+                command=lambda v=mode: on_mode_change(v),
             )
-            cb.pack(anchor="w", padx=15, pady=3)
+            if self._sidebar_mode_var.get() == mode:
+                cb.select()
+            else:
+                cb.deselect()
 
-        tk.Frame(
-            self.sidebar_filter_overlay,
-            bg=self.sidebar_filter_overlay.cget("fg_color"),
-            height=5,
-        ).pack()
+            bottom_pad = 15 if mode == "Multi-Player" else 3
+            cb.pack(anchor="w", padx=15, pady=(3, bottom_pad))
+            self._mode_checkboxes.append((cb, mode))
+
+    def _get_game_cover(self, title: str, width: int, height: int):
+        if not HAS_PIL:
+            return None
+
+        cache_key = f"{title}_{width}x{height}"
+        if cache_key in getattr(self, "_cover_cache", {}):
+            return self._cover_cache[cache_key]
+
+        # Try to find a matching JPG or PNG in the assets/covers folder
+        safe_title = title.replace(
+            ":", ""
+        )  # Strip colons which are invalid in Windows filenames
+        base_path = Path("assets/covers")
+
+        # Build the exact filename strings manually to prevent pathlib from stripping words after periods
+        cover_file = None
+        if (base_path / f"{safe_title}.jpg").exists():
+            cover_file = base_path / f"{safe_title}.jpg"
+        elif (base_path / f"{safe_title}.png").exists():
+            cover_file = base_path / f"{safe_title}.png"
+
+        if not cover_file:
+            return None
+
+        try:
+            img = Image.open(cover_file).convert("RGBA")
+            # CTkImage handles the PIL resizing internally to fit the requested dimensions
+            ctk_img = ctk.CTkImage(light_image=img, size=(width, height))
+            self._cover_cache[cache_key] = ctk_img
+            return ctk_img
+        except OSError:
+            return None
 
     # ==========================================
     #    STEAM-STYLE IN-PLACE HOVER (0.5s DELAY)
@@ -634,12 +796,22 @@ class GameLedgerApp(ctk.CTk):
         self._hover_row_frame = None
         self._hover_game_id = None
 
-    def _set_row_bg(self, frame: tk.Frame, color: str):
+    def _set_row_bg(self, frame, color):
+        """Recursively updates the background color for a row and its children, skipping redundant updates."""
         if not frame.winfo_exists():
             return
-        frame.configure(bg=color)
+
+        # 1. Removed update_idletasks() to stop mid-event screen drawing
+        # 2. Check current color before applying to prevent cascading repaints
+        if frame.cget("bg") != color:
+            frame.configure(bg=color)
+
         for child in frame.winfo_children():
-            child.configure(bg=color)
+            if isinstance(child, tk.Label):
+                if child.cget("bg") != color:
+                    child.configure(bg=color)
+            elif isinstance(child, tk.Frame):
+                self._set_row_bg(child, color)
 
     def _show_hover_overlay(self, row_frame, game, is_selected: bool):
         self._hover_after_id = None
@@ -662,6 +834,7 @@ class GameLedgerApp(ctk.CTk):
         row_cursor = "" if is_selected else "hand2"
         dot_color = self.platform_colors.get(game.platform, "gray")
 
+        # Parent to self so the full title can overlay the main panel without being cut off
         overlay = tk.Frame(
             self,
             bg=row_bg,
@@ -691,6 +864,7 @@ class GameLedgerApp(ctk.CTk):
         )
         ov_lbl.pack(side="left", pady=3, padx=(0, 12))
 
+        # Place globally on the main window
         overlay.place(x=x, y=y, height=h)
         overlay.lift()
         self._hover_overlay = overlay
@@ -790,6 +964,11 @@ class GameLedgerApp(ctk.CTk):
         self._cancel_hover_overlay()
         self.saved_search_query = ""
         self.active_filter = None
+
+        self._sidebar_search_var.set("")
+        self._sidebar_platform_var.set("")
+        self._sidebar_mode_var.set("")
+
         self.current_page = 0
         self.catalog_loaded_once = False
         self.transition_to(self.build_adding_game_screen)
@@ -969,7 +1148,16 @@ class GameLedgerApp(ctk.CTk):
         self._cancel_hover_overlay()
         if self.selected_game_id is not None:
             self.selected_game_id = None
-            self.render_sidebar()
+
+            # In-place background update avoids rebuilding the sidebar and prevents scroll jumping entirely
+            if hasattr(self, "_sidebar_item_frames"):
+                for frame, dot, title, gid in self._sidebar_item_frames:
+                    if frame.winfo_exists():
+                        self._set_row_bg(frame, BG_MAIN)
+                        frame.configure(cursor="hand2")
+                        dot.configure(cursor="hand2")
+                        title.configure(cursor="hand2")
+
         self.render_recently_played()
 
     def render_recently_played(self):
@@ -1017,6 +1205,10 @@ class GameLedgerApp(ctk.CTk):
         ).pack(side="left", padx=10)
 
     def render_sidebar(self):
+        current_yview = None
+        if hasattr(self, "_sidebar_canvas") and self._sidebar_canvas.winfo_exists():
+            current_yview = self._sidebar_canvas.yview()
+
         self._cancel_hover_overlay()
 
         self.backlog_games = self.service.filter_backlog(
@@ -1025,54 +1217,148 @@ class GameLedgerApp(ctk.CTk):
             self._sidebar_mode_var.get() or None,
         )
         self._sidebar_title_labels = []
+        self._sidebar_item_frames = []
 
-        for widget in self.sidebar_frame.winfo_children():
+        if not self.sidebar_frame.winfo_children():
+            self._sidebar_base_inner = tk.Frame(
+                self.sidebar_frame, bg=BG_MAIN, highlightthickness=0, bd=0
+            )
+            # Right padding reduced from 16 to 6 to push the scrollbar column exactly onto the middle ground
+            self._sidebar_base_inner.pack(
+                fill="both", expand=True, padx=(16, 6), pady=(20, 0)
+            )
+
+            search_frame = tk.Frame(
+                self._sidebar_base_inner, bg=BG_MAIN, highlightthickness=0, bd=0
+            )
+            # Add 10px right padding here so the search bar stays exactly where it was
+            search_frame.pack(fill="x", pady=(0, 18), padx=(0, 10))
+            search_frame.grid_columnconfigure(0, weight=1)
+            search_frame.grid_columnconfigure(1, weight=0)
+
+            search_entry = ctk.CTkEntry(
+                search_frame, placeholder_text="Search local...", width=10
+            )
+            search_entry.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+
+            def on_search(event):
+                self._sidebar_search_var.set(search_entry.get())
+                self.render_sidebar()
+
+            search_entry.bind("<KeyRelease>", on_search)
+
+            self._sidebar_filter_btn = ctk.CTkButton(
+                search_frame,
+                text="≡",
+                width=30,
+                cursor="hand2",
+                command=self.toggle_sidebar_filter_menu,
+            )
+            self._sidebar_filter_btn.grid(row=0, column=1, sticky="e")
+
+            self._sidebar_scroll_container = tk.Frame(
+                self._sidebar_base_inner, bg=BG_MAIN, highlightthickness=0, bd=0
+            )
+            self._sidebar_scroll_container.pack(fill="both", expand=True)
+            self._sidebar_scroll_container.grid_rowconfigure(
+                0, weight=0
+            )  # Row 0 is now the top buffer
+            self._sidebar_scroll_container.grid_rowconfigure(
+                1, weight=1
+            )  # Row 1 is the flexible scrolling area
+            self._sidebar_scroll_container.grid_columnconfigure(0, weight=1)
+            self._sidebar_scroll_container.grid_columnconfigure(1, weight=0)
+
+            # Invisible top buffer frame to force the scrollbar down to exactly beneath the search bar
+            tk.Frame(
+                self._sidebar_scroll_container,
+                bg=BG_MAIN,
+                height=5,
+                width=0,
+                highlightthickness=0,
+                bd=0,
+            ).grid(row=0, column=1)
+
+            self._sidebar_canvas = tk.Canvas(
+                self._sidebar_scroll_container, bg=BG_MAIN, highlightthickness=0, bd=0
+            )
+            self._sidebar_canvas.grid(row=0, column=0, rowspan=2, sticky="nsew")
+
+            # border_spacing=0 removes the invisible track overhang entirely so you can't accidentally misclick it
+            self._sidebar_scrollbar = ctk.CTkScrollbar(
+                self._sidebar_scroll_container,
+                orientation="vertical",
+                command=self._sidebar_canvas.yview,
+                width=6,
+                border_spacing=0,
+            )
+            self._sidebar_canvas.configure(yscrollcommand=self._sidebar_scrollbar.set)
+            self._sidebar_scrollbar.grid_remove()
+
+            self._sidebar_content_frame = tk.Frame(
+                self._sidebar_canvas, bg=BG_MAIN, highlightthickness=0, bd=0
+            )
+            self._sidebar_window_id = self._sidebar_canvas.create_window(
+                (0, 0), window=self._sidebar_content_frame, anchor="nw"
+            )
+
+            def _sync_sidebar_scroll(e=None):
+                self._sidebar_canvas.configure(
+                    scrollregion=self._sidebar_canvas.bbox("all")
+                )
+
+            self._sidebar_content_frame.bind("<Configure>", _sync_sidebar_scroll)
+
+            def _sync_sidebar_width(e):
+                self._sidebar_canvas.itemconfigure(
+                    self._sidebar_window_id, width=e.width
+                )
+
+            self._sidebar_canvas.bind(
+                "<Configure>",
+                lambda e: [_sync_sidebar_width(e), _sync_sidebar_scroll()],
+                add="+",
+            )
+
+        for widget in self._sidebar_content_frame.winfo_children():
             widget.destroy()
-
-        inner = tk.Frame(self.sidebar_frame, bg=BG_MAIN, highlightthickness=0, bd=0)
-        inner.pack(fill="both", expand=True, padx=16, pady=20)
-
-        search_frame = tk.Frame(inner, bg=BG_MAIN, highlightthickness=0, bd=0)
-        search_frame.pack(fill="x", pady=(0, 18))
-        search_frame.grid_columnconfigure(0, weight=1)
-        search_frame.grid_columnconfigure(1, weight=0)
-
-        search_entry = ctk.CTkEntry(
-            search_frame,
-            textvariable=self._sidebar_search_var,
-            placeholder_text="Search local...",
-            width=10,
-        )
-        search_entry.grid(row=0, column=0, sticky="ew", padx=(0, 6))
-        search_entry.bind("<KeyRelease>", lambda e: self.render_sidebar())
-
-        self._sidebar_filter_btn = ctk.CTkButton(
-            search_frame,
-            text="≡",
-            width=30,
-            cursor="hand2",
-            command=self.toggle_sidebar_filter_menu,
-        )
-        self._sidebar_filter_btn.grid(row=0, column=1, sticky="e")
 
         if not self.backlog_games:
             tk.Label(
-                inner,
+                self._sidebar_content_frame,
                 text="No games found.",
                 fg=FG_MUTED,
                 bg=BG_MAIN,
                 font=("Segoe UI", 11, "italic"),
             ).pack(pady=20)
+            self._sidebar_canvas.configure(scrollregion=(0, 0, 0, 0))
             return
 
         max_title_px = max(50, self.sidebar_width - 78)
 
+        inner = self._sidebar_content_frame
+
+        # Check if any filter is active (search text or checkboxes)
+        is_filtering = bool(
+            self._sidebar_search_var.get()
+            or self._sidebar_platform_var.get()
+            or self._sidebar_mode_var.get()
+        )
+
         for cat in ["Backlog", "In Progress", "Completed", "Abandoned"]:
-            # Sort each library's games alphabetically (A-Z)
             cat_games = sorted(
                 [g for g in self.backlog_games if g.status == cat],
                 key=lambda g: g.title.lower(),
             )
+
+            # 1. If filtering is active and this category is empty, completely hide it
+            if is_filtering and not cat_games:
+                continue
+
+            # 2. If filtering is active, force the category open so results are instantly visible
+            if is_filtering:
+                self.category_states[cat] = True
+
             arrow = "v" if self.category_states[cat] else ">"
 
             cat_row = tk.Frame(
@@ -1149,22 +1435,27 @@ class GameLedgerApp(ctk.CTk):
                     self._sidebar_title_labels.append(
                         (title_lbl, game.title, display_title)
                     )
+                    self._sidebar_item_frames.append(
+                        (item_frame, dot_lbl, title_lbl, game.id)
+                    )
 
-                    def on_enter(e, frame=item_frame, selected=is_selected, g=game):
-                        if not selected:
+                    # Dynamic checking of self.selected_game_id prevents hover bugs after in-place updates
+                    def on_enter(e, frame=item_frame, g=game):
+                        is_curr_selected = g.id == self.selected_game_id
+                        if not is_curr_selected:
                             self._set_row_bg(frame, BG_HOVER)
                         if self._hover_game_id != g.id:
                             _, is_trunc = self._truncate_text(
                                 g.title, max(50, self.sidebar_width - 78)
                             )
                             if is_trunc:
-                                self._schedule_hover_overlay(frame, g, selected)
+                                self._schedule_hover_overlay(frame, g, is_curr_selected)
                             else:
                                 self._cancel_hover_overlay()
 
-                    def on_leave(
-                        e, frame=item_frame, selected=is_selected, gid=game.id
-                    ):
+                    def on_leave(e, frame=item_frame, gid=game.id):
+                        is_curr_selected = gid == self.selected_game_id
+
                         def _check():
                             if self._is_pointer_inside(frame):
                                 return
@@ -1172,7 +1463,7 @@ class GameLedgerApp(ctk.CTk):
                                 self._hover_overlay
                             ):
                                 return
-                            if not selected and frame.winfo_exists():
+                            if not is_curr_selected and frame.winfo_exists():
                                 self._set_row_bg(frame, BG_MAIN)
                             if self._hover_game_id == gid:
                                 self._cancel_hover_overlay()
@@ -1182,17 +1473,37 @@ class GameLedgerApp(ctk.CTk):
                     for w in (item_frame, dot_lbl, title_lbl):
                         w.bind("<Enter>", on_enter)
                         w.bind("<Leave>", on_leave)
-                        if not is_selected:
-                            w.bind(
-                                "<Button-1>",
-                                lambda event=None, g=game: self.select_game(g),
-                            )
+                        # Bind click unconditionally so the previously selected game can still be clicked later
+                        w.bind(
+                            "<Button-1>", lambda event=None, g=game: self.select_game(g)
+                        )
+
+        # Restore scroll position smoothly without jumping to the top
+        if current_yview and current_yview != (0.0, 1.0):
+            self._sidebar_canvas.update_idletasks()
+            self._sidebar_canvas.yview_moveto(current_yview[0])
 
     def select_game(self, game):
         """Highlights the selected game in the sidebar and opens its inline details."""
+        if self.selected_game_id == game.id:
+            return
+
         self._cancel_hover_overlay()
         self.selected_game_id = game.id
-        self.render_sidebar()
+
+        # In-place background update avoids rebuilding the sidebar and prevents scroll jumping entirely
+        if hasattr(self, "_sidebar_item_frames"):
+            for frame, dot, title, gid in self._sidebar_item_frames:
+                if frame.winfo_exists():
+                    is_curr = gid == game.id
+                    row_bg = BG_SELECTED if is_curr else BG_MAIN
+                    row_cursor = "" if is_curr else "hand2"
+
+                    self._set_row_bg(frame, row_bg)
+                    frame.configure(cursor=row_cursor)
+                    dot.configure(cursor=row_cursor)
+                    title.configure(cursor=row_cursor)
+
         self.render_inline_game_details(game)
 
     def toggle_category(self, cat):
@@ -1203,14 +1514,17 @@ class GameLedgerApp(ctk.CTk):
     #      INLINE GAME DETAILS & REMOVE
     # ==========================================
     def render_inline_game_details(self, game):
-        self._details_sync_fn = None
-        for widget in self.main_view.winfo_children():
-            widget.destroy()
+        """Renders the detailed game view in the right-side main panel."""
+        self.catalog_loaded_once = True
 
+        # DOUBLE BUFFERING: Keep the old view on screen while we build the new one to prevent flickering
+        old_views = self.main_view.winfo_children()
+
+        layout_state = {"w": -1}
         scroll_container = tk.Frame(
             self.main_view, bg=BG_MAIN, highlightthickness=0, bd=0
         )
-        scroll_container.pack(fill="both", expand=True, padx=(10, 6), pady=10)
+        # We purposely DO NOT pack scroll_container yet! Let it build invisibly in the background.
         scroll_container.grid_rowconfigure(0, weight=1)
         scroll_container.grid_columnconfigure(0, weight=1)
         scroll_container.grid_columnconfigure(1, weight=0)
@@ -1222,9 +1536,14 @@ class GameLedgerApp(ctk.CTk):
         self._active_scroll_canvas = details_canvas
 
         v_scroll = ctk.CTkScrollbar(
-            scroll_container, orientation="vertical", command=details_canvas.yview
+            scroll_container,
+            orientation="vertical",
+            command=details_canvas.yview,
+            width=6,
+            border_spacing=0,
         )
-        v_scroll.grid(row=0, column=1, sticky="ns", padx=(4, 0))
+        self._details_scrollbar = v_scroll
+        v_scroll.place_forget()
         details_canvas.configure(yscrollcommand=v_scroll.set)
 
         details_inner = tk.Frame(details_canvas, bg=BG_MAIN, highlightthickness=0, bd=0)
@@ -1251,20 +1570,30 @@ class GameLedgerApp(ctk.CTk):
             self.after(10, self.transition_to, self.build_timer_screen, g)
 
         top_section = tk.Frame(details_inner, bg=BG_MAIN, highlightthickness=0, bd=0)
-        top_section.pack(fill="x", pady=(10, 20), padx=16)
+        # Increased top padding to 32 and left padding to 32 to push it away from the corner
+        top_section.pack(fill="x", pady=(32, 20), padx=(32, 16))
         top_section.grid_columnconfigure(0, weight=0)
         top_section.grid_columnconfigure(1, weight=1)
 
-        cover_frame = ctk.CTkFrame(top_section, width=180, height=250, corner_radius=6)
+        cover_frame = ctk.CTkFrame(
+            top_section, width=180, height=250, corner_radius=6, fg_color="#2B2B2B"
+        )
         cover_frame.grid(row=0, column=0, sticky="nw", padx=(0, 22))
         cover_frame.pack_propagate(False)
-        tk.Label(
-            cover_frame,
-            text="Game\nCover",
-            fg=FG_DIM,
-            bg="#2B2B2B",
-            font=("Segoe UI", 12, "bold"),
-        ).pack(expand=True)
+
+        cover_img = self._get_game_cover(game.title, 180, 250)
+        if cover_img:
+            ctk.CTkLabel(cover_frame, text="", image=cover_img).pack(
+                expand=True, fill="both"
+            )
+        else:
+            tk.Label(
+                cover_frame,
+                text="Game\nCover",
+                fg=FG_DIM,
+                bg="#2B2B2B",
+                font=("Segoe UI", 12, "bold"),
+            ).pack(expand=True)
 
         title_section = tk.Frame(top_section, bg=BG_MAIN, highlightthickness=0, bd=0)
         title_section.grid(row=0, column=1, sticky="nsew")
@@ -1275,8 +1604,10 @@ class GameLedgerApp(ctk.CTk):
         title_section.grid_columnconfigure(0, weight=1)
 
         title_top_row = tk.Frame(title_section, bg=BG_MAIN)
-        title_top_row.grid(row=0, column=0, sticky="nw", pady=(0, 4))
+        title_top_row.grid(row=0, column=0, sticky="ew", pady=(0, 4))
+        title_section.grid_columnconfigure(0, weight=1)
 
+        # Restoring tk.Text strictly to embed the stars inline, but fully unlocking its width and height for real-time resizing
         self.title_text = tk.Text(
             title_top_row,
             font=("Segoe UI", 24, "bold"),
@@ -1285,10 +1616,10 @@ class GameLedgerApp(ctk.CTk):
             bd=0,
             highlightthickness=0,
             wrap="word",
-            height=3,
-            width=30,
+            width=1,
+            height=1,
         )
-        self.title_text.insert("1.0", game.title + "  ")
+        self.title_text.insert("1.0", game.title + " ")
 
         latest_review = reviews[0] if reviews else None
         if latest_review and latest_review.rating is not None:
@@ -1296,33 +1627,44 @@ class GameLedgerApp(ctk.CTk):
                 self.title_text, interactive=False, size=24
             )
             self.star_canvas.set_value(latest_review.rating)
-            self.title_text.window_create("end", window=self.star_canvas, pady=4)
+            # Placing the stars inside the text itself forces them to wrap inline exactly at the end of the text
+            self.title_text.window_create(
+                "end", window=self.star_canvas, padx=8, align="center"
+            )
 
         self.title_text.configure(state="disabled")
-        self.title_text.pack(side="left", fill="x", expand=True)
+        self.title_text.pack(side="top", fill="x", expand=True)
 
         meta_str = f"{developer} · {genre} · {game.platform}"
-        tk.Label(
+        # Upgraded to a stored reference with left justification so it can be dynamically wrapped
+        self.short_details_lbl = tk.Label(
             title_section,
             text=meta_str,
             fg=FG_MUTED,
             bg=BG_MAIN,
             font=("Segoe UI", 10),
-            anchor="w",
-        ).grid(row=1, column=0, sticky="nw")
+            anchor="nw",
+            justify="left",
+        )
+        self.short_details_lbl.grid(row=1, column=0, sticky="nw", pady=(4, 0))
 
         playtime_h, playtime_m = self.session_service.get_total_playtime(game.id)
-        if playtime_h > 0 or playtime_m > 0:
+
+        # Display as long as at least one session exists, even if total time < 1 minute
+        if has_sessions:
             tk.Label(
                 title_section,
                 text=f"Play Time: {playtime_h}h {playtime_m:02d}m",
                 fg=FG_TEXT,
                 bg=BG_MAIN,
-                font=("Segoe UI", 11),
-            ).grid(row=2, column=0, sticky="sw", pady=(0, 4))
+                font=("Segoe UI", 11, "bold"),
+            ).grid(row=2, column=0, sticky="sw", pady=(12, 0))
 
         btn_row = tk.Frame(title_section, bg=BG_MAIN, highlightthickness=0, bd=0)
-        btn_row.grid(row=3, column=0, sticky="sw", pady=(15, 0))
+
+        # Dynamically reduce top padding if Play Time is visible so it sits tightly above the buttons
+        btn_pad_top = 4 if has_sessions else 15
+        btn_row.grid(row=3, column=0, sticky="sw", pady=(btn_pad_top, 0))
 
         self.dots_menu = tk.Frame(
             self.main_view,
@@ -1524,33 +1866,38 @@ class GameLedgerApp(ctk.CTk):
         ).pack(fill="x", pady=(1, 2), padx=2)
 
         mid_section = tk.Frame(details_inner, bg=BG_MAIN, highlightthickness=0, bd=0)
-        mid_section.pack(fill="x", pady=(10, 20), padx=16)
-        mid_section.grid_columnconfigure(0, weight=1)
-        mid_section.grid_columnconfigure(1, weight=0)
+        # Increased left padding to 32 to perfectly flush align with the Game Cover above it
+        mid_section.pack(fill="x", pady=(10, 20), padx=(32, 16))
+
+        # Enforce exact 70/30 split using grid uniform groups
+        mid_section.grid_columnconfigure(0, weight=7, uniform="mid_split")
+        mid_section.grid_columnconfigure(1, weight=3, uniform="mid_split")
 
         desc_lbl = tk.Label(
             mid_section,
             text=desc,
             fg=FG_DESC,
             bg=BG_MAIN,
-            font=("Segoe UI", 10),
-            wraplength=360,
+            font=("Segoe UI", 12),
             anchor="nw",
             justify="left",
         )
         desc_lbl.grid(row=0, column=0, sticky="nsew", padx=(0, 24))
 
         details_frame = tk.Frame(mid_section, bg=BG_MAIN, highlightthickness=0, bd=0)
-        details_frame.grid(row=0, column=1, sticky="ne")
+        # sticky="n" perfectly centers the Full Details block within its 30% column
+        details_frame.grid(row=0, column=1, sticky="n")
         details_frame.grid_columnconfigure((0, 1), weight=1)
 
+        # Stacked into a single column (column 0) to maximize available wrap width
         meta_cells = [
             ("DEVELOPER", developer, 0, 0),
-            ("PUBLISHER", publisher, 0, 1),
-            ("GENERAL RELEASE", general_release, 2, 0),
-            ("ADDED", datetime.now().strftime("%m/%d/%y"), 2, 1),
-            ("VERSION", game.platform, 4, 0),
+            ("PUBLISHER", publisher, 2, 0),
+            ("GENERAL RELEASE", general_release, 4, 0),
+            ("ADDED", datetime.now().strftime("%m/%d/%y"), 6, 0),
+            ("VERSION", game.platform, 8, 0),
         ]
+        meta_value_labels = []
         for label_text, value_text, r, c in meta_cells:
             tk.Label(
                 details_frame,
@@ -1560,25 +1907,30 @@ class GameLedgerApp(ctk.CTk):
                 font=("Segoe UI", 8, "bold"),
                 anchor="w",
             ).grid(row=r, column=c, sticky="w", padx=(0, 18))
-            tk.Label(
+
+            val_lbl = tk.Label(
                 details_frame,
                 text=value_text,
                 fg=FG_TEXT,
                 bg=BG_MAIN,
-                font=("Segoe UI", 10),
-                anchor="w",
-            ).grid(row=r + 1, column=c, sticky="w", padx=(0, 18), pady=(0, 12))
+                font=("Segoe UI", 12),
+                anchor="nw",
+                justify="left",
+            )
+            val_lbl.grid(row=r + 1, column=c, sticky="nw", padx=(0, 18), pady=(0, 12))
+            meta_value_labels.append(val_lbl)
 
         progress_section = tk.Frame(
             details_inner, bg=BG_MAIN, highlightthickness=0, bd=0
         )
-        progress_section.pack(fill="x", pady=(16, 20), padx=16)
+        # Increased left padding to 32 to completely flush align the entire page hierarchy
+        progress_section.pack(fill="x", pady=(16, 20), padx=(32, 16))
         tk.Label(
             progress_section,
             text="PROGRESS",
             fg=FG_TEXT,
             bg=BG_MAIN,
-            font=("Segoe UI", 11, "bold"),
+            font=("Segoe UI", 14, "bold"),
             anchor="w",
         ).pack(fill="x", pady=(0, 8))
 
@@ -1792,44 +2144,52 @@ class GameLedgerApp(ctk.CTk):
                 fill="x", pady=(4, 8)
             )
 
-            state = {"expanded": False}
+            state = {"expanded": False, "hovered": False, "leave_job": None}
 
             def set_bg(color):
-                main_row.configure(fg_color=color)
-                left_f.configure(bg=color)
-                right_f.configure(bg=color)
-                actions_f.configure(bg=color)
-                if status_f:
-                    status_f.configure(bg=color)
-                    for cw in status_f.winfo_children():
-                        cw.configure(bg=color)
-                if timer_f:
-                    timer_f.configure(bg=color)
-                    for cw in timer_f.winfo_children():
-                        cw.configure(bg=color)
-
-                for w in left_f.winfo_children() + right_f.winfo_children():
-                    if w not in (actions_f, status_f, timer_f) and not isinstance(
-                        w, ctk.CTkButton
-                    ):
-                        w.configure(bg=color)
+                if main_row.winfo_exists() and main_row.cget("fg_color") != color:
+                    main_row.configure(fg_color=color)
+                for container_f in (left_f, right_f, actions_f, status_f, timer_f):
+                    if container_f and container_f.winfo_exists():
+                        if container_f.cget("bg") != color:
+                            container_f.configure(bg=color)
+                        for cw in container_f.winfo_children():
+                            if (
+                                not isinstance(cw, ctk.CTkButton)
+                                and cw.winfo_exists()
+                                and cw.cget("bg") != color
+                            ):
+                                cw.configure(bg=color)
 
             def on_enter(e):
+                if state["leave_job"] is not None:
+                    self.after_cancel(state["leave_job"])
+                    state["leave_job"] = None
+                if state["hovered"]:
+                    return
+                state["hovered"] = True
                 set_bg(BG_HOVER)
-                if status_f:
+                if status_f and not actions_f.winfo_ismapped():
                     actions_f.pack(side="left", before=status_f)
-                elif timer_f:
+                elif timer_f and not actions_f.winfo_ismapped():
                     actions_f.pack(side="left", before=timer_f)
 
             def on_leave(e):
+                if state["leave_job"] is not None:
+                    self.after_cancel(state["leave_job"])
+
                 def check_leave():
+                    state["leave_job"] = None
                     if not main_row.winfo_exists():
                         return
-                    if not self._is_pointer_inside(main_row) and not state["expanded"]:
-                        set_bg(BG_MAIN)
-                        actions_f.pack_forget()
+                    if not self._is_pointer_inside(main_row):
+                        state["hovered"] = False
+                        if not state["expanded"]:
+                            set_bg(BG_MAIN)
+                            if actions_f.winfo_ismapped():
+                                actions_f.pack_forget()
 
-                self.after(20, check_leave)
+                state["leave_job"] = self.after(25, check_leave)
 
             def bind_hover(widget):
                 widget.bind("<Enter>", on_enter, add="+")
@@ -1859,9 +2219,12 @@ class GameLedgerApp(ctk.CTk):
                     else:
                         details_f.pack_forget()
                         arrow_lbl.configure(text=">")
-                        if not self._is_pointer_inside(main_row):
+                        still_inside = self._is_pointer_inside(main_row)
+                        state["hovered"] = still_inside
+                        if not still_inside:
                             set_bg(BG_MAIN)
-                            actions_f.pack_forget()
+                            if actions_f.winfo_ismapped():
+                                actions_f.pack_forget()
                     if (
                         self._active_scroll_canvas
                         and self._active_scroll_canvas.winfo_exists()
@@ -1933,7 +2296,7 @@ class GameLedgerApp(ctk.CTk):
         layout_state = {"w": -1}
 
         def _sync_details_width(canvas_w: int):
-            if canvas_w <= 1 or canvas_w == layout_state["w"]:
+            if canvas_w <= 1 or canvas_w == layout_state.get("w", -1):
                 return
             if not (
                 self._active_scroll_canvas.winfo_exists()
@@ -1943,13 +2306,47 @@ class GameLedgerApp(ctk.CTk):
             layout_state["w"] = canvas_w
             self._active_scroll_canvas.itemconfigure(inner_window_id, width=canvas_w)
 
-            self.title_text.configure(width=max(10, int((canvas_w - 245) / 12)))
-            desc_lbl.configure(
-                wraplength=max(150, canvas_w - details_frame.winfo_reqwidth() - 64)
-            )
+            # 1. Dynamically scale the inline Title Text widget so stars wrap seamlessly
+            if hasattr(self, "title_text") and self.title_text.winfo_exists():
+                char_width = max(1, int((canvas_w - 80) / 16))
+                self.title_text.configure(width=char_width)
+
+                if getattr(self, "_title_wrap_job", None):
+                    self.after_cancel(self._title_wrap_job)
+
+                def _apply_title_wrap():
+                    if hasattr(self, "title_text") and self.title_text.winfo_exists():
+                        dl = self.title_text.count("1.0", "end", "displaylines")
+                        if dl:
+                            self.title_text.configure(height=dl[0])
+
+                # Debounce the heavy text measuring by 30ms to completely free up the CPU during resize and drag
+                self._title_wrap_job = self.after(30, _apply_title_wrap)
+
+            # 1.5 Dynamically wrap the Short Details string so it never gets cut off
+            if (
+                hasattr(self, "short_details_lbl")
+                and self.short_details_lbl.winfo_exists()
+            ):
+                # Subtracted 240 to account for the Game Cover width, matching the title's exact wrap boundary
+                self.short_details_lbl.configure(wraplength=max(150, canvas_w - 240))
+
+            # 2. Scale Description to precisely fit the 70% column bounds
+            desc_wrap_width = max(150, int(canvas_w * 0.70) - 50)
+            if desc_lbl.winfo_exists():
+                desc_lbl.configure(wraplength=desc_wrap_width)
+
+            # 3. Scale Full Details text to strictly fit the 30% column bounds
+            meta_wrap_width = max(80, int(canvas_w * 0.30) - 40)
+            for val_lbl in meta_value_labels:
+                if val_lbl.winfo_exists():
+                    val_lbl.configure(wraplength=meta_wrap_width)
+
+            # 4. Scale Progress/Session notes
+            progress_wrap = max(150, canvas_w - 120)
             for acc_lbl in self._accordion_labels:
                 if acc_lbl.winfo_exists():
-                    acc_lbl.configure(wraplength=max(150, canvas_w - 90))
+                    acc_lbl.configure(wraplength=progress_wrap)
 
         def _sync_scrollregion(event=None):
             if self._active_scroll_canvas and self._active_scroll_canvas.winfo_exists():
@@ -1957,16 +2354,47 @@ class GameLedgerApp(ctk.CTk):
                     scrollregion=self._active_scroll_canvas.bbox("all")
                 )
 
-        def _on_canvas_configure(event):
-            _sync_details_width(event.width)
+        def _trigger_details_sync(canvas_w: int):
+            # 1. INSTANTLY resize the background container so the screen doesn't tear or flash black
+            if self._active_scroll_canvas and self._active_scroll_canvas.winfo_exists():
+                self._active_scroll_canvas.itemconfigure(
+                    inner_window_id, width=canvas_w
+                )
 
-        self._details_sync_fn = _sync_details_width
+            # 2. Debounce the heavy text wrapping math (the true source of the stuttering)
+            if getattr(self, "_details_resize_job", None):
+                self.after_cancel(self._details_resize_job)
+            self._details_resize_job = self.after(
+                20, lambda: _sync_details_width(canvas_w)
+            )
+
+        def _on_canvas_configure(event):
+            _trigger_details_sync(event.width)
+
+        self._details_sync_fn = _trigger_details_sync
         details_inner.bind("<Configure>", _sync_scrollregion)
         self._active_scroll_canvas.bind("<Configure>", _on_canvas_configure)
 
         if getattr(self, "_scroll_to_bottom_pending", False):
             self._scroll_to_bottom_pending = False
             self.after(50, lambda: self._active_scroll_canvas.yview_moveto(1.0))
+
+        # Force the layout math to run on the invisible new container
+        if self._active_scroll_canvas.winfo_exists():
+            # Get the exact true width of the right panel directly
+            initial_w = self.main_view.winfo_width()
+
+            if initial_w > 1:
+                _sync_details_width(initial_w)
+                self.update_idletasks()  # Process the wrap calculations in memory
+                _sync_details_width(
+                    initial_w
+                )  # Second pass locks in the wrapped heights
+
+        # Swap the views instantly: destroy the old, pack the new (Zero Flicker)
+        for w in old_views:
+            w.destroy()
+        scroll_container.pack(fill="both", expand=True)
 
     def execute_remove_game(self, game_id):
         self.service.remove_game(game_id)
@@ -2182,7 +2610,7 @@ class GameLedgerApp(ctk.CTk):
         self._timer_state = "ready"
         self._timer_elapsed = 0.0
         self._timer_start_perf = 0.0
-        self._exact_session_date = datetime.now().strftime("%B %d, %Y %I:%M %p")
+        self._exact_session_date = datetime.now().strftime("%B %d, %Y %I:%M:%S %p")
         self._timer_hovered_btn = None
         self._timer_rendered_sizes = {}
         self._timer_btn_geom = {}
@@ -2794,7 +3222,7 @@ class GameLedgerApp(ctk.CTk):
         today_str = (
             session_date
             if session_date
-            else datetime.now().strftime("%B %d, %Y %I:%M %p")
+            else datetime.now().strftime("%B %d, %Y %I:%M:%S %p")
         )
 
         date_frame = tk.Frame(header, bg=BG_MAIN)
@@ -3850,19 +4278,30 @@ class GameLedgerApp(ctk.CTk):
             card.pack_propagate(False)
 
             cover = ctk.CTkFrame(
-                card, width=140, height=190, corner_radius=5, cursor="hand2"
+                card,
+                width=140,
+                height=190,
+                corner_radius=5,
+                cursor="hand2",
+                fg_color="#2B2B2B",
             )
             cover.pack(pady=(10, 5))
             cover.pack_propagate(False)
 
-            lbl1 = ctk.CTkLabel(
-                cover,
-                text="Game\nCover",
-                text_color="gray50",
-                font=ctk.CTkFont(size=16, weight="bold"),
-                cursor="hand2",
-            )
-            lbl1.pack(expand=True)
+            game_title = game.get("title", "")
+            cover_img = self._get_game_cover(game_title, 140, 190)
+
+            if cover_img:
+                lbl1 = ctk.CTkLabel(cover, text="", image=cover_img, cursor="hand2")
+            else:
+                lbl1 = ctk.CTkLabel(
+                    cover,
+                    text="Game\nCover",
+                    text_color="gray50",
+                    font=ctk.CTkFont(size=16, weight="bold"),
+                    cursor="hand2",
+                )
+            lbl1.pack(expand=True, fill="both")
 
             lbl2 = ctk.CTkLabel(
                 card,
@@ -3926,16 +4365,26 @@ class GameLedgerApp(ctk.CTk):
         content_frame.grid(row=1, column=0, sticky="nsew", padx=40, pady=20)
         content_frame.grid_columnconfigure(1, weight=1)
 
-        cover_frame = ctk.CTkFrame(content_frame, width=200, height=280)
+        cover_frame = ctk.CTkFrame(
+            content_frame, width=200, height=280, fg_color="#2B2B2B"
+        )
         cover_frame.grid(row=0, column=0, sticky="n", padx=(0, 30))
         cover_frame.pack_propagate(False)
 
-        ctk.CTkLabel(
-            cover_frame,
-            text="Game\nCover",
-            text_color="gray50",
-            font=ctk.CTkFont(size=16, weight="bold"),
-        ).pack(expand=True)
+        game_title = game.get("title", "")
+        cover_img = self._get_game_cover(game_title, 200, 280)
+
+        if cover_img:
+            ctk.CTkLabel(cover_frame, text="", image=cover_img).pack(
+                expand=True, fill="both"
+            )
+        else:
+            ctk.CTkLabel(
+                cover_frame,
+                text="Game\nCover",
+                text_color="gray50",
+                font=ctk.CTkFont(size=16, weight="bold"),
+            ).pack(expand=True)
 
         mid_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
         mid_frame.grid(row=0, column=1, sticky="nsew")
