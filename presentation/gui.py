@@ -272,9 +272,10 @@ class GameLedgerApp(ctk.CTk):
 
         # Pre-load custom Edit Icon and tint it so it isn't invisible on dark mode
         self._edit_icon_img = None
-        if Path("Edit Icon.png").exists() and HAS_PIL:
+        icon_path = Path("assets/Edit Icon.png")
+        if icon_path.exists() and HAS_PIL:
             try:
-                img = Image.open("Edit Icon.png").convert("RGBA")
+                img = Image.open(icon_path).convert("RGBA")
                 data = img.getdata()
                 new_data = []
                 for item in data:
