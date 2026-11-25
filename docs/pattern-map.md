@@ -1,7 +1,5 @@
 # Creational Pattern Map
 
-One line per creational pattern: where it genuinely fits in THIS system, or an honest "no fit." An honest "no" is deliberate — forcing a pattern where nothing needs it is itself a design smell.
-
 | Pattern | Genuine fit here? |
 | :--- | :--- |
 | **Factory Method** | No genuine fit. Each repository interface (`CatalogRepository`, `GameRepository`, `SessionRepository`, `ReviewRepository`) has only one concrete implementation, and no workflow defers subclass product creation. |
