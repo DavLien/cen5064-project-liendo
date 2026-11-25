@@ -319,6 +319,12 @@ class GameLedgerApp(ctk.CTk):
         self.bind("<Configure>", self._on_window_configure)
         self.bind_all("<MouseWheel>", self._on_details_mousewheel)
 
+        self._sidebar_search_var = tk.StringVar(value="")
+        self._sidebar_platform_var = tk.StringVar(value="")
+        self._sidebar_mode_var = tk.StringVar(value="")
+
+        self.bind("<Button-1>", self._on_root_click, add="+")
+
         self.build_main_hub()
 
     # ==========================================
@@ -488,6 +494,106 @@ class GameLedgerApp(ctk.CTk):
         if canvas.yview() == (0.0, 1.0):
             return
         canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    def _on_root_click(self, event):
+        if (
+            hasattr(self, "sidebar_filter_overlay")
+            and self.sidebar_filter_overlay.winfo_exists()
+        ):
+            x, y = event.x_root, event.y_root
+            ox = self.sidebar_filter_overlay.winfo_rootx()
+            oy = self.sidebar_filter_overlay.winfo_rooty()
+            ow = self.sidebar_filter_overlay.winfo_width()
+            oh = self.sidebar_filter_overlay.winfo_height()
+
+            if (
+                hasattr(self, "_sidebar_filter_btn")
+                and self._sidebar_filter_btn.winfo_exists()
+            ):
+                bx = self._sidebar_filter_btn.winfo_rootx()
+                by = self._sidebar_filter_btn.winfo_rooty()
+                bw = self._sidebar_filter_btn.winfo_width()
+                bh = self._sidebar_filter_btn.winfo_height()
+                if bx <= x <= bx + bw and by <= y <= by + bh:
+                    return
+
+            if not (ox <= x <= ox + ow and oy <= y <= oy + oh):
+                self.sidebar_filter_overlay.destroy()
+
+    def toggle_sidebar_filter_menu(self):
+        if (
+            hasattr(self, "sidebar_filter_overlay")
+            and self.sidebar_filter_overlay.winfo_exists()
+        ):
+            self.sidebar_filter_overlay.destroy()
+            return
+
+        self.sidebar_filter_overlay = ctk.CTkFrame(
+            self, border_width=2, border_color="gray25", corner_radius=5
+        )
+
+        x = self._sidebar_filter_btn.winfo_rootx() - self.winfo_rootx()
+        y = (
+            self._sidebar_filter_btn.winfo_rooty()
+            - self.winfo_rooty()
+            + self._sidebar_filter_btn.winfo_height()
+            + 4
+        )
+        self.sidebar_filter_overlay.place(x=x, y=y)
+
+        ctk.CTkLabel(
+            self.sidebar_filter_overlay,
+            text="PLATFORM",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color="#00A8E8",
+        ).pack(anchor="w", padx=15, pady=(10, 5))
+
+        platforms = [
+            ("PlayStation 4", "PlayStation 4"),
+            ("PlayStation 5", "PlayStation 5"),
+            ("Xbox Series X/S", "Xbox Series X/S"),
+            ("PC", "PC"),
+            ("Nintendo Switch", "Nintendo Switch"),
+            ("Nintendo Switch 2", "Nintendo Switch 2"),
+        ]
+
+        def on_filter_change():
+            self.render_sidebar()
+
+        for text_lbl, val in platforms:
+            cb = ctk.CTkCheckBox(
+                self.sidebar_filter_overlay,
+                text=text_lbl,
+                variable=self._sidebar_platform_var,
+                onvalue=val,
+                offvalue="",
+                command=on_filter_change,
+            )
+            cb.pack(anchor="w", padx=15, pady=3)
+
+        ctk.CTkLabel(
+            self.sidebar_filter_overlay,
+            text="GAME MODE",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color="#00A8E8",
+        ).pack(anchor="w", padx=15, pady=(10, 5))
+
+        for mode in ["Single-Player", "Multi-Player"]:
+            cb = ctk.CTkCheckBox(
+                self.sidebar_filter_overlay,
+                text=mode,
+                variable=self._sidebar_mode_var,
+                onvalue=mode,
+                offvalue="",
+                command=on_filter_change,
+            )
+            cb.pack(anchor="w", padx=15, pady=3)
+
+        tk.Frame(
+            self.sidebar_filter_overlay,
+            bg=self.sidebar_filter_overlay.cget("fg_color"),
+            height=5,
+        ).pack()
 
     # ==========================================
     #    STEAM-STYLE IN-PLACE HOVER (0.5s DELAY)
@@ -912,7 +1018,12 @@ class GameLedgerApp(ctk.CTk):
 
     def render_sidebar(self):
         self._cancel_hover_overlay()
-        self.backlog_games = self.service.get_backlog()
+
+        self.backlog_games = self.service.filter_backlog(
+            self._sidebar_search_var.get(),
+            self._sidebar_platform_var.get() or None,
+            self._sidebar_mode_var.get() or None,
+        )
         self._sidebar_title_labels = []
 
         for widget in self.sidebar_frame.winfo_children():
@@ -926,12 +1037,33 @@ class GameLedgerApp(ctk.CTk):
         search_frame.grid_columnconfigure(0, weight=1)
         search_frame.grid_columnconfigure(1, weight=0)
 
-        ctk.CTkEntry(search_frame, placeholder_text="Search Local...", width=10).grid(
-            row=0, column=0, sticky="ew", padx=(0, 6)
+        search_entry = ctk.CTkEntry(
+            search_frame,
+            textvariable=self._sidebar_search_var,
+            placeholder_text="Search local...",
+            width=10,
         )
-        ctk.CTkButton(search_frame, text="≡", width=30, cursor="hand2").grid(
-            row=0, column=1, sticky="e"
+        search_entry.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        search_entry.bind("<KeyRelease>", lambda e: self.render_sidebar())
+
+        self._sidebar_filter_btn = ctk.CTkButton(
+            search_frame,
+            text="≡",
+            width=30,
+            cursor="hand2",
+            command=self.toggle_sidebar_filter_menu,
         )
+        self._sidebar_filter_btn.grid(row=0, column=1, sticky="e")
+
+        if not self.backlog_games:
+            tk.Label(
+                inner,
+                text="No games found.",
+                fg=FG_MUTED,
+                bg=BG_MAIN,
+                font=("Segoe UI", 11, "italic"),
+            ).pack(pady=20)
+            return
 
         max_title_px = max(50, self.sidebar_width - 78)
 
@@ -1178,6 +1310,16 @@ class GameLedgerApp(ctk.CTk):
             font=("Segoe UI", 10),
             anchor="w",
         ).grid(row=1, column=0, sticky="nw")
+
+        playtime_h, playtime_m = self.session_service.get_total_playtime(game.id)
+        if playtime_h > 0 or playtime_m > 0:
+            tk.Label(
+                title_section,
+                text=f"Play Time: {playtime_h}h {playtime_m:02d}m",
+                fg=FG_TEXT,
+                bg=BG_MAIN,
+                font=("Segoe UI", 11),
+            ).grid(row=2, column=0, sticky="sw", pady=(0, 4))
 
         btn_row = tk.Frame(title_section, bg=BG_MAIN, highlightthickness=0, bd=0)
         btn_row.grid(row=3, column=0, sticky="sw", pady=(15, 0))

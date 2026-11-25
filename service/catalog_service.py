@@ -93,3 +93,38 @@ class CatalogService:
         if game:
             game.status = new_status
             self.game_repo.update_game(game)
+
+    def filter_backlog(
+        self, search_query: str, platform: str | None = None, mode: str | None = None
+    ) -> list:
+        games = self.game_repo.get_all_games()
+        games.sort(key=lambda g: g.title.lower())
+
+        filtered = []
+        query_clean = search_query.replace(" ", "").lower() if search_query else ""
+
+        for g in games:
+            if query_clean and query_clean not in g.title.replace(" ", "").lower():
+                continue
+            if platform and g.platform != platform:
+                continue
+            if mode:
+                modes = (
+                    g.game_modes
+                    if isinstance(g.game_modes, list)
+                    else [g.game_modes]
+                    if g.game_modes
+                    else []
+                )
+                modes_lower = [m.lower() for m in modes]
+                if mode == "Single-Player" and not any(
+                    "single" in m for m in modes_lower
+                ):
+                    continue
+                if mode == "Multi-Player" and not any(
+                    "multi" in m for m in modes_lower
+                ):
+                    continue
+            filtered.append(g)
+
+        return filtered
