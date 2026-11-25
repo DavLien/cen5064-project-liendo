@@ -1,5 +1,5 @@
 from data.interfaces import GameRepository, SessionRepository
-from domain.session import PlaySession
+from domain.session import PlaySession, PlaySessionBuilder
 
 
 class SessionService:
@@ -34,22 +34,23 @@ class SessionService:
         if game is None:
             raise ValueError(f"Game with ID '{game_id}' not found.")
 
-        duration_hours = duration_seconds / 3600.0
-        game.total_hours = round(game.total_hours + duration_hours, 2)
+        session = (
+            PlaySessionBuilder(
+                game_id=game_id,
+                date=date,
+                duration_seconds=duration_seconds,
+            )
+            .with_subject(subject)
+            .with_notes(notes)
+            .build()
+        )
+
+        game.total_hours = round(game.total_hours + session.duration_hours, 2)
 
         if game.status == "Backlog":
             game.status = "In Progress"
 
         self.game_repo.update_game(game)
-
-        session = PlaySession(
-            game_id=game_id,
-            date=date,
-            duration_hours=duration_hours,
-            subject=subject,
-            notes=notes,
-            duration_seconds=duration_seconds,
-        )
 
         return self.session_repo.save_session(session)
 

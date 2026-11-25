@@ -3350,21 +3350,23 @@ class GameLedgerApp(ctk.CTk):
             is_truly_existing = existing_session and not is_deferred_new
 
             if self._mark_completed_toggled or self._mark_abandoned_toggled:
-                from domain.session import PlaySession
+                from domain.session import PlaySessionBuilder
 
                 if is_truly_existing:
                     existing_session.subject = subj
                     existing_session.notes = notes
                     mem_session = existing_session
                 else:
-                    mem_session = PlaySession(
-                        id=0,
-                        game_id=game.id,
-                        date=today_str,
-                        duration_hours=recorded_seconds / 3600.0,
-                        duration_seconds=recorded_seconds,
-                        subject=subj,
-                        notes=notes,
+                    mem_session = (
+                        PlaySessionBuilder(
+                            game_id=game.id,
+                            date=today_str,
+                            duration_seconds=recorded_seconds,
+                        )
+                        .with_id(0)
+                        .with_subject(subj)
+                        .with_notes(notes)
+                        .build()
                     )
                     mem_session.is_deferred_new = True
 
