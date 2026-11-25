@@ -73,3 +73,32 @@ class TestSessionService(unittest.TestCase):
             self.service.log_play_session(
                 game_id=999, date="November 16, 2026", duration_seconds=1.0
             )
+
+    def test_get_total_playtime_aggregation(self):
+        from domain.session import PlaySession
+
+        self.mock_session_repo.get_sessions_for_game.return_value = [
+            PlaySession(
+                id=1,
+                game_id=1,
+                date="Jan 1",
+                duration_hours=1.5,
+                duration_seconds=5400,
+                subject="",
+                notes="",
+            ),
+            PlaySession(
+                id=2,
+                game_id=1,
+                date="Jan 2",
+                duration_hours=0.1,
+                duration_seconds=360,
+                subject="",
+                notes="",
+            ),
+        ]
+
+        hours, minutes = self.service.get_total_playtime(1)
+        # Total seconds: 5760. 5760 // 3600 = 1 hr. 5760 % 3600 = 2160 sec. 2160 // 60 = 36 mins.
+        self.assertEqual(hours, 1)
+        self.assertEqual(minutes, 36)

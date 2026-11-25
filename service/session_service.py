@@ -78,3 +78,11 @@ class SessionService:
         """Deletes a single session and recalculates the game's total playtime."""
         self.session_repo.delete_session(session_id)
         self._recalculate_game_hours(game_id)
+
+    def get_total_playtime(self, game_id: int) -> tuple[int, int]:
+        sessions = self.session_repo.get_sessions_for_game(game_id)
+        # Aggregates exactly recorded seconds from all valid session/review events
+        total_seconds = sum(s.duration_seconds for s in sessions)
+        hours = int(total_seconds // 3600)
+        minutes = int((total_seconds % 3600) // 60)
+        return hours, minutes

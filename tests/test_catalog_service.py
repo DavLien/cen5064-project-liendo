@@ -81,6 +81,66 @@ class TestCatalogService(unittest.TestCase):
         self.assertEqual(saved_game.game_modes, [])
         self.assertEqual(saved_game.platform, "Xbox")
 
+    def test_filter_backlog_ignores_spaces_and_case(self):
+        from domain.game import Game
+
+        self.game_repo.get_all_games.return_value = [
+            Game(
+                id=1,
+                title="Hollow Knight",
+                platform="Nintendo Switch",
+                game_modes=["Single-Player"],
+                status="In Progress",
+                total_hours=0.0,
+            ),
+            Game(
+                id=2,
+                title="The Legend of Zelda: Breath of the Wild",
+                platform="Nintendo Switch",
+                game_modes=["Single-Player"],
+                status="Completed",
+                total_hours=0.0,
+            ),
+        ]
+
+        results = self.service.filter_backlog("ho l l ow", None, None)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].id, 1)
+
+    def test_filter_backlog_multi_criteria(self):
+        from domain.game import Game
+
+        self.game_repo.get_all_games.return_value = [
+            Game(
+                id=1,
+                title="Hollow Knight",
+                platform="Nintendo Switch",
+                game_modes=["Single-Player"],
+                status="In Progress",
+                total_hours=0.0,
+            ),
+            Game(
+                id=2,
+                title="Overwatch",
+                platform="PC",
+                game_modes=["Multi-Player"],
+                status="Backlog",
+                total_hours=0.0,
+            ),
+            Game(
+                id=3,
+                title="Overwatch",
+                platform="PlayStation 5",
+                game_modes=["Multi-Player"],
+                status="Backlog",
+                total_hours=0.0,
+            ),
+        ]
+
+        results = self.service.filter_backlog("over", "PC", "Multi-Player")
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].id, 2)
+
 
 if __name__ == "__main__":
     unittest.main()
