@@ -1,5 +1,4 @@
 import ctypes
-import json
 import math
 import sys
 import time
@@ -11,6 +10,7 @@ from tkinter import messagebox
 
 import customtkinter as ctk
 
+from data.ui_settings_store import UiSettingsStore
 from service.catalog_service import CatalogService
 from service.review_service import ReviewService
 from service.session_service import SessionService
@@ -211,7 +211,6 @@ class StarRatingWidget(tk.Canvas):
 
 
 class GameLedgerApp(ctk.CTk):
-    SETTINGS_PATH = Path("data/ui_settings.json")
     MIN_SIDEBAR_WIDTH = 185
     MIN_MAIN_WIDTH = 560
     SASH_WIDTH = 6
@@ -236,8 +235,11 @@ class GameLedgerApp(ctk.CTk):
         self._sidebar_bold_font = tkfont.Font(family="Segoe UI", size=10, weight="bold")
         self._sidebar_dot_font = tkfont.Font(family="Segoe UI", size=11)
 
-        # Load persisted sidebar width (defaults to 240px)
-        self.sidebar_width = self._load_sidebar_width()
+        # Delegate UI settings persistence to a dedicated store (SRP)
+        self._settings_store = UiSettingsStore()
+        self.sidebar_width = self._settings_store.load_sidebar_width(
+            min_width=self.MIN_SIDEBAR_WIDTH
+        )
         self._last_placed_sidebar_width = self.sidebar_width
         self._is_dragging_sash = False
         self._in_sash_update = False
@@ -337,25 +339,6 @@ class GameLedgerApp(ctk.CTk):
     # ==========================================
     #        UI SETTINGS & RESIZE HELPERS
     # ==========================================
-    def _load_sidebar_width(self) -> int:
-        try:
-            if self.SETTINGS_PATH.exists():
-                with open(self.SETTINGS_PATH, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    width = int(data.get("sidebar_width", 240))
-                    return max(self.MIN_SIDEBAR_WIDTH, width)
-        except (ValueError, OSError, json.JSONDecodeError):
-            pass
-        return 240
-
-    def _save_sidebar_width(self) -> None:
-        try:
-            self.SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.SETTINGS_PATH, "w", encoding="utf-8") as f:
-                json.dump({"sidebar_width": int(self.sidebar_width)}, f, indent=2)
-        except OSError:
-            pass
-
     def _get_max_sidebar_width(self, total_w: int | None = None) -> int:
         win_w = total_w if (total_w and total_w > 1) else max(self.winfo_width(), 1000)
         by_ratio = int(win_w * 0.45)
@@ -480,7 +463,7 @@ class GameLedgerApp(ctk.CTk):
                     self._layout_split_pane()
                     self.update_idletasks()
                     self._flush_win32_paint()
-            self._save_sidebar_width()
+            self._settings_store.save_sidebar_width(self.sidebar_width)
         elif self._is_dragging_sash and self._pending_sidebar_width is not None:
             self._sash_drag_job = self.after(16, self._apply_sash_drag)
 
@@ -500,7 +483,7 @@ class GameLedgerApp(ctk.CTk):
             if final_w != self.sidebar_width:
                 self.sidebar_width = final_w
                 self._layout_split_pane()
-        self._save_sidebar_width()
+        self._settings_store.save_sidebar_width(self.sidebar_width)
 
     def _on_details_mousewheel(self, event):
         self._cancel_hover_overlay()  # INSTANTLY clears the long title when you scroll (Fixes Issue 3)
